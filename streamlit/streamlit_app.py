@@ -214,7 +214,7 @@ with col1:
 
 with col2:
     st.markdown("<br>", unsafe_allow_html=True)  # Spacing
-    analyze_button = st.button("🔍 Analyze Stock", type="primary", use_container_width=True)
+    analyze_button = st.button("Analyze", type="primary", use_container_width=True)
 
 # Analysis
 if analyze_button:
@@ -291,8 +291,8 @@ if st.session_state.analysis_result:
             return f"${val:,.0f}"
 
     # === HEADER ROW ===
-    # Columns: Company | Market Cap | Current Price | Intrinsic Value
-    c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
+    # Columns: Company | Market Cap | Current Price | Intrinsic Value | [reserved]
+    c1, c2, c3, c4, _ = st.columns([1.2, 0.7, 0.7, 0.7, 1.5])
 
     with c1:
         st.markdown(f"### {result.get('company_name', ticker)}")
@@ -317,11 +317,11 @@ if st.session_state.analysis_result:
     st.markdown("---")
 
     # === KEY METRICS ROW ===
-    # Columns aligned with header: Input Type | Historical Growth | Projected Growth | WACC
+    # Columns aligned with header: Input Type | Historical Growth | Projected Growth | WACC | [reserved]
     input_type = result.get('input_type', 'fcf')
     input_label = "EPS from Cont Ops" if input_type == 'eps_cont_ops' else "FCF per Share"
 
-    c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
+    c1, c2, c3, c4, _ = st.columns([1.2, 0.7, 0.7, 0.7, 1.5])
 
     with c1:
         st.metric("Input Type", input_label, help="What metric is being projected")
@@ -356,8 +356,8 @@ if st.session_state.analysis_result:
     intrinsic_ps = result['intrinsic_value']
     intrinsic_total = intrinsic_ps * shares
 
-    # Columns aligned with rows above: [1.5] | [1] | [1] | [1]
-    c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
+    # Columns aligned with rows above: [1.2] | [0.7] | [0.7] | [0.7] | [reserved]
+    c1, c2, c3, c4, _ = st.columns([1.2, 0.7, 0.7, 0.7, 1.5])
 
     with c1:
         st.markdown("**Valuation Breakdown**")
@@ -393,7 +393,7 @@ if st.session_state.analysis_result:
 
 else:
     # Welcome message
-    st.info("👆 Enter a stock ticker and click 'Analyze Stock' to begin")
+    st.info("👆 Enter a stock ticker and click 'Analyze' to begin")
     
     # Feature highlights
     st.markdown("### ✨ Features")
