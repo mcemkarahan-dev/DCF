@@ -4,18 +4,11 @@ Professional DCF valuation tool with 30+ years of historical data
 """
 
 import streamlit as st
-import sys
-import os
-from pathlib import Path
+import pandas as pd
 
-# Add shared modules to path - works both locally and on Streamlit Cloud
-current_dir = Path(__file__).parent
-shared_dir = current_dir.parent / 'shared'
-sys.path.insert(0, str(shared_dir))
-
+# Direct imports - files are in same directory
 from dcf_calculator import DCFAnalyzer
 from config import PRESET_CONFIGS
-import pandas as pd
 
 # Page configuration
 st.set_page_config(
