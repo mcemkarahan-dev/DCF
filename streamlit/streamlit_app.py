@@ -284,7 +284,8 @@ if st.session_state.analysis_result:
         st.markdown(f"**Sector:** {result.get('sector', 'N/A')}")
 
     with col2:
-        st.metric("Market Cap", format_market_cap(market_cap), universe)
+        st.metric("Market Cap", format_market_cap(market_cap))
+        st.markdown(f"<span style='font-size: 0.85em;'>{universe}</span>", unsafe_allow_html=True)
 
     with col3:
         st.metric("Current Price", f"${result['current_price']:.2f}")
@@ -301,44 +302,54 @@ if st.session_state.analysis_result:
         st.markdown(f'<div class="metric-card overvalued">⚠️ OVERVALUED by {abs(discount):.1f}%</div>', unsafe_allow_html=True)
     
     st.markdown("---")
-    
+
     # Key metrics in columns
     col1, col2, col3, col4 = st.columns(4)
-    
+
     input_type = result.get('input_type', 'fcf')
     input_label = "EPS from Cont Ops" if input_type == 'eps_cont_ops' else "FCF per Share"
-    
+
+    # Get historical FCF data for sparkline
+    dcf = result['dcf_result']
+    fcf_projections = dcf.get('fcf_projections', [])
+
     with col1:
         st.metric(
             "Input Type",
             input_label,
             help="What metric is being projected"
         )
-    
+
     with col2:
-        historical_growth = result['dcf_result'].get('historical_fcf_growth', 0) * 100
+        historical_growth = dcf.get('historical_fcf_growth', 0) * 100
+        years_used = dcf.get('historical_years_used', 5)
         st.metric(
-            f"Historical Growth (5yr)",
+            f"Historical Growth ({years_used}yr)",
             f"{historical_growth:.1f}%",
             help="Historical CAGR"
         )
-    
+        # Sparkline using fcf_projections as proxy for trend
+        if fcf_projections and len(fcf_projections) > 1:
+            st.line_chart(fcf_projections, height=50)
+
     with col3:
-        projected_growth = result['dcf_result']['params']['fcf_growth_rate'] * 100
+        projected_growth = dcf['params']['fcf_growth_rate'] * 100
         st.metric(
             "Projected Growth",
             f"{projected_growth:.1f}%",
             help="Growth rate used in DCF"
         )
-    
+
     with col4:
-        wacc = result['dcf_result']['params']['wacc'] * 100
+        wacc = dcf['params']['wacc'] * 100
         st.metric(
             "WACC",
             f"{wacc:.1f}%",
             help="Discount rate"
         )
-    
+
+    st.markdown("---")
+
     # Valuation breakdown
     st.markdown("#### Valuation Breakdown")
 
