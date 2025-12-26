@@ -276,84 +276,10 @@ if st.session_state.analysis_result:
 
     market_cap = result.get('market_cap', 0)
     universe = get_market_cap_universe(market_cap)
-
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-
-    with col1:
-        st.markdown(f"### {result.get('company_name', ticker)}")
-        st.markdown(f"**Sector:** {result.get('sector', 'N/A')}")
-
-    with col2:
-        st.metric("Market Cap", format_market_cap(market_cap))
-        st.markdown(f"<span style='font-size: 0.85em;'>{universe}</span>", unsafe_allow_html=True)
-
-    with col3:
-        st.metric("Current Price", f"${result['current_price']:.2f}")
-
-    with col4:
-        st.metric("Intrinsic Value", f"${result['intrinsic_value']:.2f}")
-    
-    # Valuation assessment
-    discount = result['discount']
-    
-    if discount > 0:
-        st.markdown(f'<div class="metric-card undervalued">✅ UNDERVALUED by {discount:.1f}%</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="metric-card overvalued">⚠️ OVERVALUED by {abs(discount):.1f}%</div>', unsafe_allow_html=True)
-    
-    st.markdown("---")
-
-    # Key metrics in columns
-    col1, col2, col3, col4 = st.columns(4)
-
-    input_type = result.get('input_type', 'fcf')
-    input_label = "EPS from Cont Ops" if input_type == 'eps_cont_ops' else "FCF per Share"
-
-    # Get historical FCF data for sparkline
     dcf = result['dcf_result']
-    fcf_projections = dcf.get('fcf_projections', [])
+    shares = dcf.get('shares_outstanding', 1)
 
-    with col1:
-        st.metric(
-            "Input Type",
-            input_label,
-            help="What metric is being projected"
-        )
-
-    with col2:
-        historical_growth = dcf.get('historical_fcf_growth', 0) * 100
-        years_used = dcf.get('historical_years_used', 5)
-        st.metric(
-            f"Historical Growth ({years_used}yr)",
-            f"{historical_growth:.1f}%",
-            help="Historical CAGR"
-        )
-        # Sparkline using fcf_projections as proxy for trend
-        if fcf_projections and len(fcf_projections) > 1:
-            st.line_chart(fcf_projections, height=50)
-
-    with col3:
-        projected_growth = dcf['params']['fcf_growth_rate'] * 100
-        st.metric(
-            "Projected Growth",
-            f"{projected_growth:.1f}%",
-            help="Growth rate used in DCF"
-        )
-
-    with col4:
-        wacc = dcf['params']['wacc'] * 100
-        st.metric(
-            "WACC",
-            f"{wacc:.1f}%",
-            help="Discount rate"
-        )
-
-    st.markdown("---")
-
-    # Valuation breakdown
-    st.markdown("#### Valuation Breakdown")
-
-    # Format large numbers
+    # Format large numbers helper
     def format_value(val):
         if val >= 1e12:
             return f"${val/1e12:.2f}T"
@@ -364,45 +290,92 @@ if st.session_state.analysis_result:
         else:
             return f"${val:,.0f}"
 
-    dcf = result['dcf_result']
-    shares = dcf.get('shares_outstanding', 1)
+    # === HEADER ROW ===
+    # Columns: Company | Market Cap | Current Price | Intrinsic Value | [reserved space]
+    c1, c2, c3, c4, c_empty = st.columns([1.5, 1, 1, 1, 2])
 
-    # Per-share values from DCF (since we use FCF per share as input)
+    with c1:
+        st.markdown(f"### {result.get('company_name', ticker)}")
+        st.markdown(f"**Sector:** {result.get('sector', 'N/A')}")
+
+    with c2:
+        st.metric("Market Cap", format_market_cap(market_cap))
+        st.caption(universe)
+
+    with c3:
+        st.metric("Current Price", f"${result['current_price']:.2f}")
+
+    with c4:
+        st.metric("Intrinsic Value", f"${result['intrinsic_value']:.2f}")
+
+    # Valuation assessment
+    discount = result['discount']
+    if discount > 0:
+        st.markdown(f'<div class="metric-card undervalued">✅ UNDERVALUED by {discount:.1f}%</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="metric-card overvalued">⚠️ OVERVALUED by {abs(discount):.1f}%</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # === KEY METRICS ROW ===
+    # Columns aligned with header: Input Type | Historical Growth | Projected Growth | WACC | [reserved]
+    input_type = result.get('input_type', 'fcf')
+    input_label = "EPS from Cont Ops" if input_type == 'eps_cont_ops' else "FCF per Share"
+
+    c1, c2, c3, c4, c_empty = st.columns([1.5, 1, 1, 1, 2])
+
+    with c1:
+        st.metric("Input Type", input_label, help="What metric is being projected")
+
+    with c2:
+        historical_growth = dcf.get('historical_fcf_growth', 0) * 100
+        years_used = dcf.get('historical_years_used', 5)
+        st.metric(f"Historical Growth ({years_used}yr)", f"{historical_growth:.1f}%", help="Historical CAGR")
+
+    with c3:
+        projected_growth = dcf['params']['fcf_growth_rate'] * 100
+        st.metric("Projected Growth", f"{projected_growth:.1f}%", help="Growth rate used in DCF")
+
+    with c4:
+        wacc = dcf['params']['wacc'] * 100
+        st.metric("WACC", f"{wacc:.1f}%", help="Discount rate")
+
+    st.markdown("---")
+
+    # === VALUATION BREAKDOWN ===
+    st.markdown("#### Valuation Breakdown")
+
+    # Per-share values from DCF
     pv_fcf_ps = dcf.get('pv_fcf', 0)
     pv_terminal_ps = dcf.get('pv_terminal', 0)
     enterprise_ps = dcf.get('enterprise_value', 0)
 
-    # Calculate totals (per-share * shares)
+    # Calculate totals
     pv_fcf_total = pv_fcf_ps * shares
     pv_terminal_total = pv_terminal_ps * shares
     enterprise_total = enterprise_ps * shares
-
-    # Final valuation
     equity_total = dcf.get('equity_value', 0)
     equity_ps = equity_total / shares if shares else 0
     intrinsic_ps = result['intrinsic_value']
     intrinsic_total = intrinsic_ps * shares
 
-    # Layout: two value columns + space for future chart
-    col1, col2, col3 = st.columns([1, 1, 1])
+    # Columns aligned: PV Components | Final Valuation | [reserved space]
+    c1, c2, c_empty = st.columns([2.5, 2, 2])
 
-    with col1:
-        st.markdown("**Present Value Components:**")
+    with c1:
+        st.markdown("**Present Value Components**")
         st.metric("PV of Projected Cash Flows", format_value(pv_fcf_total), f"${pv_fcf_ps:.2f}/share")
         st.metric("PV of Terminal Value", format_value(pv_terminal_total), f"${pv_terminal_ps:.2f}/share")
         st.metric("Enterprise Value", format_value(enterprise_total), f"${enterprise_ps:.2f}/share")
 
-    with col2:
-        st.markdown("**Final Valuation:**")
+    with c2:
+        st.markdown("**Final Valuation**")
         st.metric("Equity Value", format_value(equity_total), f"${equity_ps:.2f}/share")
         st.metric("Intrinsic Value", format_value(intrinsic_total), f"${intrinsic_ps:.2f}/share")
         st.metric("Shares Outstanding", f"{shares/1e9:.2f}B" if shares >= 1e9 else f"{shares/1e6:.1f}M")
 
-    with col3:
-        # Placeholder for future chart
-        st.markdown("**Chart (coming soon)**")
-        st.empty()
-    
+    # c_empty reserved for future content
+
     # DCF Parameters used
     with st.expander("📋 DCF Parameters Used"):
         params_df = pd.DataFrame({
