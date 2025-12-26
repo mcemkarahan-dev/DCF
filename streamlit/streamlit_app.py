@@ -291,16 +291,15 @@ if st.session_state.analysis_result:
             return f"${val:,.0f}"
 
     # === HEADER ROW ===
-    # Columns: Company | Market Cap | Current Price | Intrinsic Value | [reserved space]
-    c1, c2, c3, c4, c_empty = st.columns([1.5, 1, 1, 1, 2])
+    # Columns: Company | Market Cap | Current Price | Intrinsic Value
+    c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
 
     with c1:
         st.markdown(f"### {result.get('company_name', ticker)}")
         st.markdown(f"**Sector:** {result.get('sector', 'N/A')}")
 
     with c2:
-        st.metric("Market Cap", format_market_cap(market_cap))
-        st.caption(universe)
+        st.metric("Market Cap", format_market_cap(market_cap), universe, delta_color="off")
 
     with c3:
         st.metric("Current Price", f"${result['current_price']:.2f}")
@@ -318,11 +317,11 @@ if st.session_state.analysis_result:
     st.markdown("---")
 
     # === KEY METRICS ROW ===
-    # Columns aligned with header: Input Type | Historical Growth | Projected Growth | WACC | [reserved]
+    # Columns aligned with header: Input Type | Historical Growth | Projected Growth | WACC
     input_type = result.get('input_type', 'fcf')
     input_label = "EPS from Cont Ops" if input_type == 'eps_cont_ops' else "FCF per Share"
 
-    c1, c2, c3, c4, c_empty = st.columns([1.5, 1, 1, 1, 2])
+    c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
 
     with c1:
         st.metric("Input Type", input_label, help="What metric is being projected")
@@ -357,8 +356,8 @@ if st.session_state.analysis_result:
     intrinsic_ps = result['intrinsic_value']
     intrinsic_total = intrinsic_ps * shares
 
-    # Columns aligned with rows above: [1.5] | [1] | [1] | [1] | [2]
-    c1, c2, c3, c4, c_empty = st.columns([1.5, 1, 1, 1, 2])
+    # Columns aligned with rows above: [1.5] | [1] | [1] | [1]
+    c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
 
     with c1:
         st.markdown("**Valuation Breakdown**")
@@ -371,8 +370,6 @@ if st.session_state.analysis_result:
         st.metric("Equity Value", format_value(equity_total), f"${equity_ps:.1f}/sh")
         st.metric("Intrinsic Value", format_value(intrinsic_total), f"${intrinsic_ps:.1f}/sh")
         st.metric("Shares Outstanding", f"{shares/1e9:.1f}B" if shares >= 1e9 else f"{shares/1e6:.0f}M")
-
-    # c3, c4, c_empty reserved for future content
 
     # DCF Parameters used
     with st.expander("📋 DCF Parameters Used"):
