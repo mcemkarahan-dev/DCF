@@ -316,19 +316,22 @@ if st.session_state.analysis_result:
             else:
                 return f"${val:,.0f}"
         
-        pv_fcf = result.get('pv_fcf', 0)
-        pv_terminal = result.get('pv_terminal', 0)
-        
+        dcf = result['dcf_result']
+        pv_fcf = dcf.get('pv_fcf', 0)
+        pv_terminal = dcf.get('pv_terminal', 0)
+
         st.metric("PV of Projected Cash Flows", format_value(pv_fcf))
         st.metric("PV of Terminal Value", format_value(pv_terminal))
-        st.metric("Total Enterprise Value", format_value(result.get('enterprise_value', 0)))
-    
+        st.metric("Total Enterprise Value", format_value(dcf.get('enterprise_value', 0)))
+
     with col2:
         st.markdown("**Per Share Values:**")
-        
-        equity_value_per_share = result['equity_value'] / result['shares_outstanding']
-        
-        st.metric("Enterprise Value per Share", f"${result.get('enterprise_value', 0) / result['shares_outstanding']:.2f}")
+
+        dcf = result['dcf_result']
+        shares = dcf.get('shares_outstanding', 1)
+        equity_value_per_share = dcf.get('equity_value', 0) / shares if shares else 0
+
+        st.metric("Enterprise Value per Share", f"${dcf.get('enterprise_value', 0) / shares:.2f}" if shares else "$0.00")
         st.metric("Equity Value per Share", f"${equity_value_per_share:.2f}")
         st.metric("Intrinsic Value per Share", f"${result['intrinsic_value']:.2f}")
     
