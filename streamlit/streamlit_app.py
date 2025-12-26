@@ -299,46 +299,56 @@ if st.session_state.analysis_result:
     
     # Valuation breakdown
     st.markdown("### 📈 Valuation Breakdown")
-    
-    col1, col2 = st.columns(2)
-    
+
+    # Format large numbers
+    def format_value(val):
+        if val >= 1e12:
+            return f"${val/1e12:.2f}T"
+        elif val >= 1e9:
+            return f"${val/1e9:.2f}B"
+        elif val >= 1e6:
+            return f"${val/1e6:.2f}M"
+        else:
+            return f"${val:,.0f}"
+
+    dcf = result['dcf_result']
+    shares = dcf.get('shares_outstanding', 1)
+
+    # Per-share values from DCF (since we use FCF per share as input)
+    pv_fcf_ps = dcf.get('pv_fcf', 0)
+    pv_terminal_ps = dcf.get('pv_terminal', 0)
+    enterprise_ps = dcf.get('enterprise_value', 0)
+
+    # Calculate totals (per-share * shares)
+    pv_fcf_total = pv_fcf_ps * shares
+    pv_terminal_total = pv_terminal_ps * shares
+    enterprise_total = enterprise_ps * shares
+
+    # Final valuation
+    equity_total = dcf.get('equity_value', 0)
+    equity_ps = equity_total / shares if shares else 0
+    intrinsic_ps = result['intrinsic_value']
+    intrinsic_total = intrinsic_ps * shares
+
+    # Layout: two value columns + space for future chart
+    col1, col2, col3 = st.columns([1, 1, 1])
+
     with col1:
         st.markdown("**Present Value Components:**")
-        
-        # Format large numbers
-        def format_value(val):
-            if val >= 1e12:
-                return f"${val/1e12:.2f}T"
-            elif val >= 1e9:
-                return f"${val/1e9:.2f}B"
-            elif val >= 1e6:
-                return f"${val/1e6:.2f}M"
-            else:
-                return f"${val:,.0f}"
-        
-        dcf = result['dcf_result']
-        pv_fcf = dcf.get('pv_fcf', 0)
-        pv_terminal = dcf.get('pv_terminal', 0)
-        enterprise_value = dcf.get('enterprise_value', 0)
-
-        # Note: These are per-share values since we use FCF per share as input
-        st.metric("PV of Projected Cash Flows (per share)", f"${pv_fcf:.2f}")
-        st.metric("PV of Terminal Value (per share)", f"${pv_terminal:.2f}")
-        st.metric("Enterprise Value (per share)", f"${enterprise_value:.2f}")
+        st.metric("PV of Projected Cash Flows", format_value(pv_fcf_total), f"${pv_fcf_ps:.2f}/share")
+        st.metric("PV of Terminal Value", format_value(pv_terminal_total), f"${pv_terminal_ps:.2f}/share")
+        st.metric("Enterprise Value", format_value(enterprise_total), f"${enterprise_ps:.2f}/share")
 
     with col2:
         st.markdown("**Final Valuation:**")
+        st.metric("Equity Value", format_value(equity_total), f"${equity_ps:.2f}/share")
+        st.metric("Intrinsic Value", format_value(intrinsic_total), f"${intrinsic_ps:.2f}/share")
+        st.metric("Shares Outstanding", f"{shares/1e9:.2f}B" if shares >= 1e9 else f"{shares/1e6:.1f}M")
 
-        dcf = result['dcf_result']
-        equity_value_total = dcf.get('equity_value', 0)  # This is TOTAL
-        shares = dcf.get('shares_outstanding', 1)
-
-        # equity_value is total, divide by shares for per-share
-        equity_per_share = equity_value_total / shares if shares else 0
-
-        st.metric("Equity Value (per share)", f"${equity_per_share:.2f}")
-        st.metric("Intrinsic Value (per share)", f"${result['intrinsic_value']:.2f}")
-        st.metric("Total Equity Value", format_value(equity_value_total))
+    with col3:
+        # Placeholder for future chart
+        st.markdown("**Chart (coming soon)**")
+        st.empty()
     
     # DCF Parameters used
     with st.expander("📋 DCF Parameters Used"):
