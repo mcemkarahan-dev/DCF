@@ -55,27 +55,37 @@ if 'api_key' not in st.session_state:
 if 'analysis_result' not in st.session_state:
     st.session_state.analysis_result = None
 
+# Try to load API key from Streamlit secrets (for persistence)
+def get_saved_api_key():
+    try:
+        return st.secrets.get("ROIC_API_KEY", "")
+    except:
+        return ""
+
+if 'api_key' not in st.session_state or not st.session_state.api_key:
+    st.session_state.api_key = get_saved_api_key()
+
 # Sidebar - Configuration
 with st.sidebar:
-    st.markdown("## ⚙️ Configuration")
-    
+    st.markdown("## Configuration")
+
     # Data Source
     data_source = st.radio(
         "Data Source",
         ["Roic.ai (30+ years)", "Yahoo Finance (4-5 years)"],
         help="Roic.ai requires API key but provides 30+ years of data"
     )
-    
+
     # API Key
     if "Roic" in data_source:
         api_key = st.text_input(
             "Roic.ai API Key",
             value=st.session_state.api_key,
             type="password",
-            help="Get your API key from https://roic.ai"
+            help="Add ROIC_API_KEY to Streamlit secrets for persistence"
         )
         st.session_state.api_key = api_key
-        
+
         if api_key:
             st.success("✓ API key provided")
         else:
@@ -274,8 +284,7 @@ if st.session_state.analysis_result:
         st.markdown(f"**Sector:** {result.get('sector', 'N/A')}")
 
     with col2:
-        st.metric("Market Cap", format_market_cap(market_cap))
-        st.caption(f"*{universe}*")
+        st.metric("Market Cap", format_market_cap(market_cap), universe)
 
     with col3:
         st.metric("Current Price", f"${result['current_price']:.2f}")
@@ -331,7 +340,7 @@ if st.session_state.analysis_result:
         )
     
     # Valuation breakdown
-    st.markdown("### 📈 Valuation Breakdown")
+    st.markdown("#### Valuation Breakdown")
 
     # Format large numbers
     def format_value(val):
