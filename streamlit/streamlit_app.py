@@ -251,7 +251,7 @@ if st.session_state.analysis_result:
         st.metric("Intrinsic Value", f"${result['intrinsic_value']:.2f}")
     
     # Valuation assessment
-    discount = result['discount_percentage']
+    discount = result['discount']
     
     if discount > 0:
         st.markdown(f'<div class="metric-card undervalued">✅ UNDERVALUED by {discount:.1f}%</div>', unsafe_allow_html=True)
