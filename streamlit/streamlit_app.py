@@ -274,7 +274,7 @@ if st.session_state.analysis_result:
         )
     
     with col2:
-        historical_growth = result.get('historical_fcf_growth', 0) * 100
+        historical_growth = result['dcf_result'].get('historical_fcf_growth', 0) * 100
         st.metric(
             f"Historical Growth (5yr)",
             f"{historical_growth:.1f}%",
@@ -319,21 +319,26 @@ if st.session_state.analysis_result:
         dcf = result['dcf_result']
         pv_fcf = dcf.get('pv_fcf', 0)
         pv_terminal = dcf.get('pv_terminal', 0)
+        enterprise_value = dcf.get('enterprise_value', 0)
 
-        st.metric("PV of Projected Cash Flows", format_value(pv_fcf))
-        st.metric("PV of Terminal Value", format_value(pv_terminal))
-        st.metric("Total Enterprise Value", format_value(dcf.get('enterprise_value', 0)))
+        # Note: These are per-share values since we use FCF per share as input
+        st.metric("PV of Projected Cash Flows (per share)", f"${pv_fcf:.2f}")
+        st.metric("PV of Terminal Value (per share)", f"${pv_terminal:.2f}")
+        st.metric("Enterprise Value (per share)", f"${enterprise_value:.2f}")
 
     with col2:
-        st.markdown("**Per Share Values:**")
+        st.markdown("**Final Valuation:**")
 
         dcf = result['dcf_result']
+        equity_value_total = dcf.get('equity_value', 0)  # This is TOTAL
         shares = dcf.get('shares_outstanding', 1)
-        equity_value_per_share = dcf.get('equity_value', 0) / shares if shares else 0
 
-        st.metric("Enterprise Value per Share", f"${dcf.get('enterprise_value', 0) / shares:.2f}" if shares else "$0.00")
-        st.metric("Equity Value per Share", f"${equity_value_per_share:.2f}")
-        st.metric("Intrinsic Value per Share", f"${result['intrinsic_value']:.2f}")
+        # equity_value is total, divide by shares for per-share
+        equity_per_share = equity_value_total / shares if shares else 0
+
+        st.metric("Equity Value (per share)", f"${equity_per_share:.2f}")
+        st.metric("Intrinsic Value (per share)", f"${result['intrinsic_value']:.2f}")
+        st.metric("Total Equity Value", format_value(equity_value_total))
     
     # DCF Parameters used
     with st.expander("📋 DCF Parameters Used"):
