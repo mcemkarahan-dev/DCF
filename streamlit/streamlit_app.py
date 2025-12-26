@@ -298,19 +298,21 @@ if st.session_state.analysis_result:
 
     with c1:
         st.markdown(f"### {ticker}")
-        st.markdown(f"{result.get('company_name', '')}")
-        st.markdown(f"{result.get('sector', 'N/A')}")
+        company_name = result.get('company_name', '')
+        sector = result.get('sector', 'N/A')
+        # Company name and sector on same line or tight spacing
+        st.caption(f"{company_name}  •  {sector}")
 
     with c2:
         st.metric("Market Cap", format_market_cap(market_cap), universe, delta_color="off")
 
     with c3:
         st.metric("Current Price", f"${result['current_price']:.2f}")
-        # Valuation status under price
+        # Valuation status under price (tight spacing)
         if discount > 0:
-            st.markdown(f"<span style='color: green; font-size: 0.9em;'>Undervalued {discount:.1f}%</span>", unsafe_allow_html=True)
+            st.caption(f":green[Undervalued {discount:.1f}%]")
         else:
-            st.markdown(f"<span style='color: red; font-size: 0.9em;'>Overvalued {abs(discount):.1f}%</span>", unsafe_allow_html=True)
+            st.caption(f":red[Overvalued {abs(discount):.1f}%]")
 
     with c4:
         st.metric("Intrinsic Value", f"${result['intrinsic_value']:.2f}")
