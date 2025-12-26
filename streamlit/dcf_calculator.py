@@ -5,6 +5,19 @@ Supports multiple DCF models with configurable parameters
 
 from typing import List, Dict, Optional
 import statistics
+from datetime import datetime
+
+
+def format_value(value):
+    """Format large numbers with T/B/M notation"""
+    if abs(value) >= 1_000_000_000_000:
+        return f"${value / 1_000_000_000_000:.1f}T"
+    elif abs(value) >= 1_000_000_000:
+        return f"${value / 1_000_000_000:.1f}B"
+    elif abs(value) >= 1_000_000:
+        return f"${value / 1_000_000:.1f}M"
+    else:
+        return f"${value:,.0f}"
 
 
 class DCFCalculator:
@@ -449,6 +462,152 @@ class DCFCalculator:
             'debt': debt,
             'shares_outstanding': shares,
             'params': params
+        }
+
+
+class DCFAnalyzer:
+    def __init__(self, api_key: str = None, db_path: str = "dcf_analysis.db", data_source: str = "yahoo"):
+        """
+        Initialize DCF Analyzer
+
+        data_source options:
+        - "yahoo": Yahoo Finance (free, 4-5 years of data, no API key needed)
+        - "roic": Roic.ai (paid, 30+ years of data, requires API key)
+        """
+        from database import DCFDatabase
+        from screener import StockScreener
+
+        self.db = DCFDatabase(db_path)
+        self.data_source = data_source
+
+        # Initialize appropriate data fetcher
+        if data_source == "roic":
+            from data_fetcher_roic import RoicDataFetcher
+            self.fetcher = RoicDataFetcher(api_key)
+            print("Using Roic.ai data source (30+ years of history)")
+        else:  # yahoo (default)
+            from data_fetcher_yahoo import YahooFinanceFetcher
+            self.fetcher = YahooFinanceFetcher(api_key)
+            print("Using Yahoo Finance data source (4-5 years of history)")
+
+        self.calculator = DCFCalculator()
+        self.screener = StockScreener(self.db)
+
+    def analyze_stock(self, ticker: str, params: Dict = None, save: bool = True, years_back: int = None) -> Dict:
+        """
+        Analyze a single stock with DCF
+        years_back: Number of years of historical data to fetch (only used with roic.ai)
+        """
+        print(f"\n{'='*60}")
+        print(f"Analyzing {ticker}")
+        print(f"{'='*60}")
+
+        # Determine years_back based on data source and parameters
+        if years_back is None:
+            if self.data_source == "roic":
+                years_back = params.get('projection_years', 10) if params else 10
+            else:
+                years_back = 5
+
+        # Fetch data
+        if hasattr(self.fetcher, 'get_financial_data_complete'):
+            if self.data_source == "roic":
+                financial_data = self.fetcher.get_financial_data_complete(ticker, years_back=years_back)
+            else:
+                financial_data = self.fetcher.get_financial_data_complete(ticker)
+        else:
+            financial_data = self.fetcher.get_financial_data_complete(ticker)
+
+        if not financial_data['profile']:
+            print(f"Error: Could not fetch data for {ticker}")
+            return None
+
+        # Save company info
+        profile = financial_data['profile']
+        self.db.add_stock(
+            ticker=ticker,
+            company_name=profile.get('companyName'),
+            exchange=profile.get('exchangeShortName'),
+            sector=profile.get('sector'),
+            industry=profile.get('industry')
+        )
+
+        # Save financial data
+        if financial_data['cash_flows']:
+            for cf in financial_data['cash_flows'][:5]:
+                period_date = cf.get('date')
+
+                income = next((i for i in financial_data['income_statements']
+                             if i.get('date') == period_date), {})
+                balance = next((b for b in financial_data['balance_sheets']
+                              if b.get('date') == period_date), {})
+
+                fcf = self.fetcher.calculate_fcf_from_statements(cf)
+
+                self.db.add_financial_data(
+                    ticker=ticker,
+                    period_date=period_date,
+                    period_type=cf.get('period', 'annual'),
+                    revenue=income.get('revenue', 0) or 0,
+                    operating_income=income.get('operatingIncome', 0) or 0,
+                    net_income=income.get('netIncome', 0) or 0,
+                    free_cash_flow=fcf,
+                    total_debt=balance.get('totalDebt', 0) or 0,
+                    cash_and_equivalents=balance.get('cashAndCashEquivalents', 0) or 0,
+                    shares_outstanding=balance.get('commonStock', 0) or 0
+                )
+
+        # Run DCF
+        dcf_result = self.calculator.run_full_dcf(financial_data, params=params)
+
+        if not dcf_result:
+            print(f"Error: Could not calculate DCF for {ticker}")
+            return None
+
+        # Extract results
+        intrinsic_value = dcf_result['intrinsic_value_per_share']
+        current_price = financial_data['current_price']
+
+        # Print results
+        print(f"\nCompany: {profile.get('companyName')}")
+        print(f"Sector: {profile.get('sector')}")
+        print(f"Current Price: ${current_price:.2f}")
+        print(f"Intrinsic Value: ${intrinsic_value:.2f}")
+
+        discount = ((intrinsic_value - current_price) / current_price * 100) if current_price else 0
+        print(f"Discount/Premium: {discount:+.2f}%")
+
+        if discount > 20:
+            print(f"*** UNDERVALUED - Trading {abs(discount):.1f}% below intrinsic value ***")
+        elif discount < -20:
+            print(f"*** OVERVALUED - Trading {abs(discount):.1f}% above intrinsic value ***")
+        else:
+            print(f"*** FAIRLY VALUED ***")
+
+        # Save DCF calculation
+        if save:
+            self.db.save_dcf_calculation(
+                ticker=ticker,
+                model_type=params.get('model_type', 'revenue_based') if params else 'revenue_based',
+                parameters=dcf_result['params'],
+                intrinsic_value=intrinsic_value,
+                current_price=current_price,
+                wacc=dcf_result['params']['wacc'],
+                terminal_growth_rate=dcf_result['params']['terminal_growth_rate'],
+                projection_years=dcf_result['params']['projection_years'],
+                fcf_projections=dcf_result['fcf_projections'],
+                terminal_value=dcf_result['terminal_value'],
+                enterprise_value=dcf_result['enterprise_value'],
+                equity_value=dcf_result['equity_value'],
+                shares_outstanding=dcf_result['shares_outstanding']
+            )
+
+        return {
+            'ticker': ticker,
+            'intrinsic_value': intrinsic_value,
+            'current_price': current_price,
+            'discount': discount,
+            'dcf_result': dcf_result
         }
 
 
