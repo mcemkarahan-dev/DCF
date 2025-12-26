@@ -602,8 +602,15 @@ class DCFAnalyzer:
                 shares_outstanding=dcf_result['shares_outstanding']
             )
 
+        # Get market cap for universe classification
+        market_cap = current_price * dcf_result.get('shares_outstanding', 0) if current_price else 0
+
         return {
             'ticker': ticker,
+            'company_name': profile.get('companyName', ticker),
+            'sector': profile.get('sector', 'N/A'),
+            'industry': profile.get('industry', 'N/A'),
+            'market_cap': market_cap,
             'intrinsic_value': intrinsic_value,
             'current_price': current_price,
             'discount': discount,

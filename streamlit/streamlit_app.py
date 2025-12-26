@@ -238,16 +238,49 @@ if st.session_state.analysis_result:
     
     # Company header
     st.markdown("---")
-    col1, col2, col3 = st.columns([2, 1, 1])
-    
+
+    # Helper function for market cap universe
+    def get_market_cap_universe(mkt_cap):
+        if mkt_cap >= 200e9:
+            return "Mega Cap"
+        elif mkt_cap >= 10e9:
+            return "Large Cap"
+        elif mkt_cap >= 2e9:
+            return "Mid Cap"
+        elif mkt_cap >= 300e6:
+            return "Small Cap"
+        elif mkt_cap >= 50e6:
+            return "Micro Cap"
+        else:
+            return "Nano Cap"
+
+    def format_market_cap(mkt_cap):
+        if mkt_cap >= 1e12:
+            return f"${mkt_cap/1e12:.2f}T"
+        elif mkt_cap >= 1e9:
+            return f"${mkt_cap/1e9:.2f}B"
+        elif mkt_cap >= 1e6:
+            return f"${mkt_cap/1e6:.2f}M"
+        else:
+            return f"${mkt_cap:,.0f}"
+
+    market_cap = result.get('market_cap', 0)
+    universe = get_market_cap_universe(market_cap)
+
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+
     with col1:
         st.markdown(f"### {result.get('company_name', ticker)}")
         st.markdown(f"**Sector:** {result.get('sector', 'N/A')}")
-    
+
     with col2:
-        st.metric("Current Price", f"${result['current_price']:.2f}")
-    
+        st.metric("Market Cap", format_market_cap(market_cap))
+        st.caption(f"*{universe}*")
+
     with col3:
+        st.metric("Current Price", f"${result['current_price']:.2f}")
+
+    with col4:
         st.metric("Intrinsic Value", f"${result['intrinsic_value']:.2f}")
     
     # Valuation assessment
