@@ -279,14 +279,14 @@ if st.session_state.analysis_result:
     dcf = result['dcf_result']
     shares = dcf.get('shares_outstanding', 1)
 
-    # Format large numbers helper
+    # Format large numbers helper (1 decimal place)
     def format_value(val):
         if val >= 1e12:
-            return f"${val/1e12:.2f}T"
+            return f"${val/1e12:.1f}T"
         elif val >= 1e9:
-            return f"${val/1e9:.2f}B"
+            return f"${val/1e9:.1f}B"
         elif val >= 1e6:
-            return f"${val/1e6:.2f}M"
+            return f"${val/1e6:.1f}M"
         else:
             return f"${val:,.0f}"
 
@@ -343,8 +343,6 @@ if st.session_state.analysis_result:
     st.markdown("---")
 
     # === VALUATION BREAKDOWN ===
-    st.markdown("#### Valuation Breakdown")
-
     # Per-share values from DCF
     pv_fcf_ps = dcf.get('pv_fcf', 0)
     pv_terminal_ps = dcf.get('pv_terminal', 0)
@@ -359,22 +357,22 @@ if st.session_state.analysis_result:
     intrinsic_ps = result['intrinsic_value']
     intrinsic_total = intrinsic_ps * shares
 
-    # Columns aligned: PV Components | Final Valuation | [reserved space]
-    c1, c2, c_empty = st.columns([2.5, 2, 2])
+    # Columns aligned with rows above: [1.5] | [1] | [1] | [1] | [2]
+    c1, c2, c3, c4, c_empty = st.columns([1.5, 1, 1, 1, 2])
 
     with c1:
-        st.markdown("**Present Value Components**")
-        st.metric("PV of Projected Cash Flows", format_value(pv_fcf_total), f"${pv_fcf_ps:.2f}/share")
-        st.metric("PV of Terminal Value", format_value(pv_terminal_total), f"${pv_terminal_ps:.2f}/share")
-        st.metric("Enterprise Value", format_value(enterprise_total), f"${enterprise_ps:.2f}/share")
+        st.markdown("**Valuation Breakdown**")
+        st.metric("PV of Projected Cash Flows", format_value(pv_fcf_total), f"${pv_fcf_ps:.1f}/sh")
+        st.metric("PV of Terminal Value", format_value(pv_terminal_total), f"${pv_terminal_ps:.1f}/sh")
+        st.metric("Enterprise Value", format_value(enterprise_total), f"${enterprise_ps:.1f}/sh")
 
     with c2:
-        st.markdown("**Final Valuation**")
-        st.metric("Equity Value", format_value(equity_total), f"${equity_ps:.2f}/share")
-        st.metric("Intrinsic Value", format_value(intrinsic_total), f"${intrinsic_ps:.2f}/share")
-        st.metric("Shares Outstanding", f"{shares/1e9:.2f}B" if shares >= 1e9 else f"{shares/1e6:.1f}M")
+        st.markdown("&nbsp;")  # Spacer to align with header
+        st.metric("Equity Value", format_value(equity_total), f"${equity_ps:.1f}/sh")
+        st.metric("Intrinsic Value", format_value(intrinsic_total), f"${intrinsic_ps:.1f}/sh")
+        st.metric("Shares Outstanding", f"{shares/1e9:.1f}B" if shares >= 1e9 else f"{shares/1e6:.0f}M")
 
-    # c_empty reserved for future content
+    # c3, c4, c_empty reserved for future content
 
     # DCF Parameters used
     with st.expander("📋 DCF Parameters Used"):
