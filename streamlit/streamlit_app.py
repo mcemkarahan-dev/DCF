@@ -104,53 +104,50 @@ with st.sidebar:
     if customize:
         st.markdown("### Custom Parameters")
         
-        wacc = st.slider(
-            "WACC (Discount Rate)",
-            min_value=0.05,
-            max_value=0.20,
-            value=preset['wacc'],
-            step=0.01,
-            format="%.1f%%",
+        wacc = st.number_input(
+            "WACC (Discount Rate) %",
+            min_value=1.0,
+            max_value=50.0,
+            value=preset['wacc'] * 100,
+            step=0.5,
             help="Weighted Average Cost of Capital"
-        ) 
-        
-        terminal_growth = st.slider(
-            "Terminal Growth Rate",
+        ) / 100
+
+        terminal_growth = st.number_input(
+            "Terminal Growth Rate %",
             min_value=0.0,
-            max_value=0.05,
-            value=preset['terminal_growth_rate'],
-            step=0.005,
-            format="%.1f%%",
+            max_value=10.0,
+            value=preset['terminal_growth_rate'] * 100,
+            step=0.25,
             help="Perpetual growth rate"
-        )
-        
-        fcf_growth = st.slider(
-            "FCF/EPS Growth Rate",
-            min_value=0.0,
-            max_value=0.30,
-            value=preset['fcf_growth_rate'],
-            step=0.01,
-            format="%.1f%%",
+        ) / 100
+
+        fcf_growth = st.number_input(
+            "FCF/EPS Growth Rate %",
+            min_value=-50.0,
+            max_value=100.0,
+            value=preset['fcf_growth_rate'] * 100,
+            step=1.0,
             help="Projected growth rate"
-        )
-        
-        projection_years = st.slider(
+        ) / 100
+
+        projection_years = st.number_input(
             "Projection Years",
-            min_value=3,
-            max_value=15,
+            min_value=1,
+            max_value=30,
             value=preset['projection_years'],
+            step=1,
             help="Number of years to project"
         )
-        
-        margin_of_safety = st.slider(
-            "Margin of Safety",
+
+        margin_of_safety = st.number_input(
+            "Margin of Safety %",
             min_value=0.0,
-            max_value=0.30,
-            value=preset['conservative_adjustment'],
-            step=0.05,
-            format="%.0f%%",
+            max_value=50.0,
+            value=preset['conservative_adjustment'] * 100,
+            step=5.0,
             help="Safety haircut to intrinsic value"
-        )
+        ) / 100
         
         # Update params
         params = {
@@ -179,11 +176,12 @@ with st.sidebar:
         params['dcf_input_type'] = input_type
         
         if "Roic" in data_source:
-            years_back = st.slider(
+            years_back = st.number_input(
                 "Years of History",
                 min_value=5,
                 max_value=30,
                 value=10,
+                step=1,
                 help="How many years of historical data to fetch"
             )
         else:
@@ -250,7 +248,7 @@ if st.session_state.analysis_result:
         st.metric("Current Price", f"${result['current_price']:.2f}")
     
     with col3:
-        st.metric("Intrinsic Value", f"${result['intrinsic_value_per_share']:.2f}")
+        st.metric("Intrinsic Value", f"${result['intrinsic_value']:.2f}")
     
     # Valuation assessment
     discount = result['discount_percentage']
@@ -332,7 +330,7 @@ if st.session_state.analysis_result:
         
         st.metric("Enterprise Value per Share", f"${result.get('enterprise_value', 0) / result['shares_outstanding']:.2f}")
         st.metric("Equity Value per Share", f"${equity_value_per_share:.2f}")
-        st.metric("Intrinsic Value per Share", f"${result['intrinsic_value_per_share']:.2f}")
+        st.metric("Intrinsic Value per Share", f"${result['intrinsic_value']:.2f}")
     
     # DCF Parameters used
     with st.expander("📋 DCF Parameters Used"):
