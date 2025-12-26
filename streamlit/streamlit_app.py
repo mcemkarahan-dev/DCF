@@ -6,9 +6,12 @@ Professional DCF valuation tool with 30+ years of historical data
 import streamlit as st
 import sys
 import os
+from pathlib import Path
 
-# Add shared modules to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
+# Add shared modules to path - works both locally and on Streamlit Cloud
+current_dir = Path(__file__).parent
+shared_dir = current_dir.parent / 'shared'
+sys.path.insert(0, str(shared_dir))
 
 from dcf_calculator import DCFAnalyzer
 from config import PRESET_CONFIGS
