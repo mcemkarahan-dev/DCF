@@ -294,25 +294,26 @@ if st.session_state.analysis_result:
     # Columns: Company | Market Cap | Current Price | Intrinsic Value | [reserved]
     c1, c2, c3, c4, _ = st.columns([1.2, 0.7, 0.7, 0.7, 1.5])
 
+    discount = result['discount']
+
     with c1:
-        st.markdown(f"### {result.get('company_name', ticker)}")
-        st.markdown(f"**Sector:** {result.get('sector', 'N/A')}")
+        st.markdown(f"### {ticker}")
+        st.markdown(f"{result.get('company_name', '')}")
+        st.markdown(f"{result.get('sector', 'N/A')}")
 
     with c2:
         st.metric("Market Cap", format_market_cap(market_cap), universe, delta_color="off")
 
     with c3:
         st.metric("Current Price", f"${result['current_price']:.2f}")
+        # Valuation status under price
+        if discount > 0:
+            st.markdown(f"<span style='color: green; font-size: 0.9em;'>Undervalued {discount:.1f}%</span>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<span style='color: red; font-size: 0.9em;'>Overvalued {abs(discount):.1f}%</span>", unsafe_allow_html=True)
 
     with c4:
         st.metric("Intrinsic Value", f"${result['intrinsic_value']:.2f}")
-
-    # Valuation assessment
-    discount = result['discount']
-    if discount > 0:
-        st.markdown(f'<div class="metric-card undervalued">✅ UNDERVALUED by {discount:.1f}%</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="metric-card overvalued">⚠️ OVERVALUED by {abs(discount):.1f}%</div>', unsafe_allow_html=True)
 
     st.markdown("---")
 
