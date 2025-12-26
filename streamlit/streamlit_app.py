@@ -282,7 +282,7 @@ if st.session_state.analysis_result:
         )
     
     with col3:
-        projected_growth = result['params']['fcf_growth_rate'] * 100
+        projected_growth = result['dcf_result']['params']['fcf_growth_rate'] * 100
         st.metric(
             "Projected Growth",
             f"{projected_growth:.1f}%",
@@ -290,7 +290,7 @@ if st.session_state.analysis_result:
         )
     
     with col4:
-        wacc = result['params']['wacc'] * 100
+        wacc = result['dcf_result']['params']['wacc'] * 100
         st.metric(
             "WACC",
             f"{wacc:.1f}%",
@@ -343,11 +343,11 @@ if st.session_state.analysis_result:
                 'Margin of Safety'
             ],
             'Value': [
-                f"{result['params']['wacc']*100:.1f}%",
-                f"{result['params']['terminal_growth_rate']*100:.1f}%",
-                f"{result['params']['fcf_growth_rate']*100:.1f}%",
-                f"{result['params']['projection_years']}",
-                f"{result['params']['conservative_adjustment']*100:.1f}%"
+                f"{result['dcf_result']['params']['wacc']*100:.1f}%",
+                f"{result['dcf_result']['params']['terminal_growth_rate']*100:.1f}%",
+                f"{result['dcf_result']['params']['fcf_growth_rate']*100:.1f}%",
+                f"{result['dcf_result']['params']['projection_years']}",
+                f"{result['dcf_result']['params']['conservative_adjustment']*100:.1f}%"
             ]
         })
         st.dataframe(params_df, hide_index=True, use_container_width=True)
