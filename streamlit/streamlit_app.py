@@ -5,6 +5,11 @@ Professional DCF valuation tool with 30+ years of historical data
 
 import streamlit as st
 import pandas as pd
+import sys
+import os
+
+# Add current directory to Python path for Streamlit Cloud compatibility
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Direct imports - files are in same directory
 from dcf_calculator import DCFAnalyzer
