@@ -857,35 +857,82 @@ with tab_history:
     if not st.session_state.analysis_history:
         st.info("No analyses yet. Analyze stocks to see them here.")
     else:
-        # Build history table
+        # Build history table with Universe and Sector
         history_data = []
         for r in st.session_state.analysis_history:
             dcf_r = r.get('dcf_result', {})
-            shares_r = dcf_r.get('shares_outstanding', 1)
+            mkt_cap = r.get('market_cap', 0)
 
             history_data.append({
                 'Ticker': r.get('ticker', ''),
-                'Company': r.get('company_name', '')[:30],
-                'Price': f"${r.get('current_price', 0):.2f}",
-                'Intrinsic': f"${r.get('intrinsic_value', 0):.2f}",
-                'Discount': f"{r.get('discount', 0):+.1f}%",
-                'Market Cap': format_market_cap(r.get('market_cap', 0)),
+                'Universe': get_market_cap_universe(mkt_cap),
+                'Sector': r.get('sector', 'N/A'),
+                'Company': r.get('company_name', '')[:25],
+                'Price': r.get('current_price', 0),
+                'Intrinsic': r.get('intrinsic_value', 0),
+                'Discount': r.get('discount', 0),
+                'Market Cap': mkt_cap,
             })
 
         history_df = pd.DataFrame(history_data)
 
-        # Selection
-        ticker_options = [r['ticker'] for r in st.session_state.analysis_history]
-        selected_ticker = st.selectbox("Select Ticker for Details", ticker_options, index=0)
+        # ===== FILTERS FOR TABLE =====
+        filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 2])
 
-        # Highlight selected
-        def highlight_selected(row):
-            if row['Ticker'] == selected_ticker:
-                return ['background-color: #e8f0fe'] * len(row)
-            return [''] * len(row)
+        with filter_col1:
+            # Universe filter
+            universe_options = sorted(history_df['Universe'].unique().tolist())
+            selected_universe = st.multiselect(
+                "Filter by Universe",
+                options=universe_options,
+                default=[],
+                placeholder="All Universes"
+            )
 
-        styled_df = history_df.style.apply(highlight_selected, axis=1)
-        st.dataframe(styled_df, hide_index=True, use_container_width=True, height=350)
+        with filter_col2:
+            # Sector filter
+            sector_options = sorted(history_df['Sector'].unique().tolist())
+            selected_sector_filter = st.multiselect(
+                "Filter by Sector",
+                options=sector_options,
+                default=[],
+                placeholder="All Sectors"
+            )
+
+        # Apply filters
+        filtered_df = history_df.copy()
+        if selected_universe:
+            filtered_df = filtered_df[filtered_df['Universe'].isin(selected_universe)]
+        if selected_sector_filter:
+            filtered_df = filtered_df[filtered_df['Sector'].isin(selected_sector_filter)]
+
+        # Show count
+        st.caption(f"Showing {len(filtered_df)} of {len(history_df)} stocks")
+
+        # Selection for details
+        if len(filtered_df) > 0:
+            ticker_options = filtered_df['Ticker'].tolist()
+            selected_ticker = st.selectbox("Select Ticker for Details", ticker_options, index=0)
+        else:
+            selected_ticker = None
+
+        # Display table with sorting enabled via column_config
+        st.dataframe(
+            filtered_df,
+            hide_index=True,
+            use_container_width=True,
+            height=350,
+            column_config={
+                "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                "Universe": st.column_config.TextColumn("Universe", width="medium"),
+                "Sector": st.column_config.TextColumn("Sector", width="medium"),
+                "Company": st.column_config.TextColumn("Company", width="medium"),
+                "Price": st.column_config.NumberColumn("Price", format="$%.2f", width="small"),
+                "Intrinsic": st.column_config.NumberColumn("Intrinsic", format="$%.2f", width="small"),
+                "Discount": st.column_config.NumberColumn("Discount", format="%.1f%%", width="small"),
+                "Market Cap": st.column_config.NumberColumn("Mkt Cap", format="$%.0f", width="medium"),
+            }
+        )
 
         st.markdown("---")
 
