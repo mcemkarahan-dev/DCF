@@ -441,36 +441,42 @@ class BatchScreener:
         Check if stock passes basic filters.
         Empty filter list = pass all (SELECT ALL behavior).
         """
-        # Sector filter - empty means all
-        sector_filter = filters.get('sector', [])
-        if sector_filter and len(sector_filter) > 0:
+        # If filters is None or empty, pass all stocks
+        if not filters:
+            return True
+
+        # Sector filter - empty/None means all
+        sector_filter = filters.get('sector')
+        if sector_filter and isinstance(sector_filter, list) and len(sector_filter) > 0:
             stock_sector = stock.get('sector', 'N/A')
-            if stock_sector not in sector_filter and stock_sector != 'N/A':
+            # If stock sector is N/A, let it pass (we don't know the sector)
+            if stock_sector != 'N/A' and stock_sector not in sector_filter:
                 return False
-            # If sector is N/A but filter is active, we might still want to include it
-            # Let's be permissive and include N/A sectors
 
-        # Exchange filter - empty means all
-        exchange_filter = filters.get('exchange', [])
-        if exchange_filter and len(exchange_filter) > 0:
+        # Exchange filter - empty/None means all
+        exchange_filter = filters.get('exchange')
+        if exchange_filter and isinstance(exchange_filter, list) and len(exchange_filter) > 0:
             stock_exchange = stock.get('exchange', 'N/A')
-            # Normalize exchange
-            if 'NASDAQ' in stock_exchange.upper() or 'NMS' in stock_exchange.upper():
-                stock_exchange = 'NASDAQ'
-            elif 'NYSE' in stock_exchange.upper() or 'NYQ' in stock_exchange.upper():
-                stock_exchange = 'NYSE'
-            elif 'AMEX' in stock_exchange.upper():
-                stock_exchange = 'AMEX'
+            # Normalize exchange name
+            if stock_exchange and stock_exchange != 'N/A':
+                stock_exchange_upper = stock_exchange.upper()
+                if 'NASDAQ' in stock_exchange_upper or 'NMS' in stock_exchange_upper or 'NGM' in stock_exchange_upper:
+                    stock_exchange = 'NASDAQ'
+                elif 'NYSE' in stock_exchange_upper or 'NYQ' in stock_exchange_upper:
+                    stock_exchange = 'NYSE'
+                elif 'AMEX' in stock_exchange_upper:
+                    stock_exchange = 'AMEX'
 
-            if stock_exchange not in exchange_filter and stock_exchange != 'N/A':
+            # If stock exchange is N/A, let it pass
+            if stock_exchange != 'N/A' and stock_exchange not in exchange_filter:
                 return False
 
-        # Market cap universe filter - empty means all
-        market_cap_filter = filters.get('market_cap_universe', [])
-        if market_cap_filter and len(market_cap_filter) > 0:
+        # Market cap universe filter - empty/None means all
+        # Note: This is checked again after enrichment if needed
+        market_cap_filter = filters.get('market_cap_universe')
+        if market_cap_filter and isinstance(market_cap_filter, list) and len(market_cap_filter) > 0:
             universe = stock.get('market_cap_universe', 'Unknown')
-            # If unknown and filter is active, we should probably include it
-            # and let enrichment determine the actual value
+            # If unknown, let it pass (will be checked after enrichment)
             if universe != 'Unknown' and universe not in market_cap_filter:
                 return False
 
@@ -570,7 +576,10 @@ class BatchScreener:
 
         stocks = self.get_stock_universe()
 
+        print(f"DEBUG: Got {len(stocks)} stocks in universe")
+
         if not stocks:
+            print("DEBUG: No stocks in universe!")
             if progress_callback:
                 progress_callback(100, 100, "No stocks found in universe", False)
             return
@@ -580,11 +589,15 @@ class BatchScreener:
         need_enrichment = self.needs_enrichment(filters)
         need_financial = self.has_financial_filters(filters)
 
+        print(f"DEBUG: need_enrichment={need_enrichment}, need_financial={need_financial}")
+        print(f"DEBUG: filters={filters}")
+
         if progress_callback:
             progress_callback(5, 100, f"Screening {total_stocks} stocks...", True)
 
         for i, stock in enumerate(stocks):
             if max_stocks and matched_count >= max_stocks:
+                print(f"DEBUG: Reached max_stocks limit ({max_stocks})")
                 break
 
             # Progress update
@@ -593,7 +606,10 @@ class BatchScreener:
                 progress_callback(pct, 100, f"Checking {stock['ticker']}... ({matched_count} matched)", True)
 
             # Step 1: Basic filters (sector, exchange) - fast, no API call
-            if not self.passes_basic_filters(stock, filters):
+            passes_basic = self.passes_basic_filters(stock, filters)
+            if not passes_basic:
+                if i < 5:  # Debug first few
+                    print(f"DEBUG: {stock['ticker']} failed basic filters (sector={stock.get('sector')}, exchange={stock.get('exchange')})")
                 continue
 
             # Step 2: Enrichment if needed (market cap universe, gross margin)
@@ -619,12 +635,14 @@ class BatchScreener:
 
             # Stock passed all filters!
             matched_count += 1
+            print(f"DEBUG: {stock['ticker']} MATCHED! (count={matched_count})")
 
             if match_callback:
                 match_callback(stock)
 
             yield stock
 
+        print(f"DEBUG: Screening complete, {matched_count} stocks matched")
         if progress_callback:
             progress_callback(100, 100, f"Screening complete: {matched_count} stocks matched", False)
 

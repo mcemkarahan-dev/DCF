@@ -280,103 +280,113 @@ with st.sidebar:
         st.markdown("---")
         st.markdown("## 🔍 Batch Filters")
 
-        # Initialize filter values in session state
-        if 'batch_filters' not in st.session_state:
-            st.session_state.batch_filters = {}
+        # Reset button
+        if st.button("🔄 Reset All Filters", use_container_width=True):
+            # Clear filter-related session state
+            for key in list(st.session_state.keys()):
+                if key.startswith('filter_'):
+                    del st.session_state[key]
+            st.rerun()
 
-        batch_filters = {}
-
-        # Group filters by category
-        filters_by_category = get_filters_by_category()
+        st.caption("Leave filters empty to select ALL stocks in that category")
 
         # Basic Filters
         with st.expander("📌 Basic Filters", expanded=True):
-            batch_filters['sector'] = st.multiselect(
+            filter_sector = st.multiselect(
                 "Sector",
                 options=get_all_sectors(),
                 default=[],
+                key="filter_sector",
                 help="Filter by company sector (leave empty for all)"
             )
 
-            batch_filters['exchange'] = st.multiselect(
+            filter_exchange = st.multiselect(
                 "Exchange",
                 options=get_all_exchanges(),
                 default=[],
+                key="filter_exchange",
                 help="Filter by stock exchange (leave empty for all)"
             )
 
         # Market Filters
         with st.expander("📊 Market Filters", expanded=False):
-            batch_filters['market_cap_universe'] = st.multiselect(
+            filter_market_cap = st.multiselect(
                 "Market Cap Universe",
                 options=get_all_market_cap_universes(),
                 default=[],
+                key="filter_market_cap",
                 help="Filter by market cap tier (leave empty for all)"
             )
 
         # Profitability Filters
         with st.expander("💰 Profitability Filters", expanded=False):
-            batch_filters['positive_fcf_last_year'] = st.selectbox(
+            filter_fcf_last_year = st.selectbox(
                 "Positive FCF (Last Year)",
                 options=["Any", "Yes", "No"],
                 index=0,
+                key="filter_fcf_last_year",
                 help="Require positive FCF in the most recent year"
             )
 
-            batch_filters['positive_fcf_years_3'] = st.number_input(
+            filter_fcf_years_3 = st.number_input(
                 "Min Positive FCF Years (Last 3)",
                 min_value=0,
                 max_value=3,
                 value=0,
                 step=1,
+                key="filter_fcf_years_3",
                 help="Minimum years with positive FCF in last 3 years"
             )
 
-            batch_filters['positive_fcf_years_5'] = st.number_input(
+            filter_fcf_years_5 = st.number_input(
                 "Min Positive FCF Years (Last 5)",
                 min_value=0,
                 max_value=5,
                 value=0,
                 step=1,
+                key="filter_fcf_years_5",
                 help="Minimum years with positive FCF in last 5 years"
             )
 
-            batch_filters['positive_fcf_years_10'] = st.number_input(
+            filter_fcf_years_10 = st.number_input(
                 "Min Positive FCF Years (Last 10)",
                 min_value=0,
                 max_value=10,
                 value=0,
                 step=1,
+                key="filter_fcf_years_10",
                 help="Minimum years with positive FCF in last 10 years"
             )
 
-            batch_filters['min_gross_margin'] = st.number_input(
+            filter_gross_margin = st.number_input(
                 "Minimum Gross Margin %",
                 min_value=0.0,
                 max_value=100.0,
                 value=0.0,
                 step=5.0,
+                key="filter_gross_margin",
                 help="Minimum gross margin percentage"
             )
 
         # Growth Filters
         with st.expander("📈 Growth Filters", expanded=False):
-            batch_filters['revenue_growth_years_5'] = st.number_input(
+            filter_rev_growth = st.number_input(
                 "Min Revenue Growth Years (Last 5)",
                 min_value=0,
                 max_value=5,
                 value=0,
                 step=1,
+                key="filter_rev_growth",
                 help="Minimum years with revenue growth in last 5 years"
             )
 
         # Additional Filters (placeholder for future)
         with st.expander("🔮 Additional Filters", expanded=False):
             st.caption("More filters coming soon...")
-            st.caption("• Dividend yield range")
-            st.caption("• P/E ratio range")
-            st.caption("• Debt/Equity ratio")
-            st.caption("• ROE/ROIC minimums")
+            st.caption("- Dividend yield range")
+            st.caption("- P/E ratio range")
+            st.caption("- Debt/Equity ratio")
+            st.caption("- ROE/ROIC minimums")
 
         # Batch options
         st.markdown("---")
@@ -388,9 +398,22 @@ with st.sidebar:
             max_value=100,
             value=20,
             step=5,
+            key="max_stocks_batch",
             help="Maximum number of stocks to analyze after filtering"
         )
 
+        # Build batch_filters dict from individual filter values
+        batch_filters = {
+            'sector': filter_sector,
+            'exchange': filter_exchange,
+            'market_cap_universe': filter_market_cap,
+            'positive_fcf_last_year': filter_fcf_last_year,
+            'positive_fcf_years_3': filter_fcf_years_3,
+            'positive_fcf_years_5': filter_fcf_years_5,
+            'positive_fcf_years_10': filter_fcf_years_10,
+            'min_gross_margin': filter_gross_margin,
+            'revenue_growth_years_5': filter_rev_growth,
+        }
         st.session_state.batch_filters = batch_filters
 
 # Main content - Header
@@ -490,12 +513,19 @@ with tab1:
             else:
                 st.session_state.batch_running = True
 
+                # Get the current batch_filters from session state
+                current_filters = st.session_state.get('batch_filters', {})
+
                 # Create UI elements for live updates
                 progress_bar = st.progress(0)
                 status_container = st.container()
                 with status_container:
                     status_text = st.empty()
                     filtering_indicator = st.empty()
+
+                # Debug: Show what filters are being used
+                with st.expander("Debug: Active Filters", expanded=False):
+                    st.json(current_filters)
 
                 # Live matched tickers display
                 st.markdown("---")
@@ -539,7 +569,7 @@ with tab1:
                     # Use streaming to show matches live
                     filtered_stocks = []
                     for stock in screener.screen_stocks_streaming(
-                        filters=batch_filters,
+                        filters=current_filters,
                         progress_callback=update_progress,
                         match_callback=on_match,
                         max_stocks=max_stocks_val
