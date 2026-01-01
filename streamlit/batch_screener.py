@@ -840,6 +840,9 @@ class BatchScreener:
 
     def needs_enrichment(self, filters: Dict) -> bool:
         """Check if we need to enrich stocks with additional data"""
+        # Need enrichment if sector filter is active (NASDAQ stocks don't have sector)
+        if filters.get('sector') and len(filters['sector']) > 0:
+            return True
         # Need enrichment if market cap filter is active
         if filters.get('market_cap_universe') and len(filters['market_cap_universe']) > 0:
             return True
@@ -907,10 +910,17 @@ class BatchScreener:
                 #     print(f"DEBUG: {stock['ticker']} failed basic filters")
                 continue
 
-            # Step 2: Enrichment if needed (market cap universe, gross margin)
+            # Step 2: Enrichment if needed (market cap universe, sector, gross margin)
             if need_enrichment:
                 stock = self.enrich_stock_info(stock)
                 time.sleep(0.1)  # Rate limiting
+
+                # Re-check sector filter after enrichment (sector may have been N/A before)
+                sector_filter = filters.get('sector', [])
+                if sector_filter and len(sector_filter) > 0:
+                    stock_sector = stock.get('sector', 'N/A')
+                    if stock_sector != 'N/A' and stock_sector not in sector_filter:
+                        continue
 
                 # Re-check market cap filter after enrichment
                 market_cap_filter = filters.get('market_cap_universe', [])
