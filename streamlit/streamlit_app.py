@@ -1037,12 +1037,14 @@ with tab_history:
     history_count = len(st.session_state.analysis_history)
     st.caption(f"Storage: {backend} | Items: {history_count}")
 
-    # Initialize filter state
+    # Initialize filter states
     if 'show_positive_iv_only' not in st.session_state:
         st.session_state.show_positive_iv_only = False
+    if 'show_undervalued_only' not in st.session_state:
+        st.session_state.show_undervalued_only = False
 
-    # All 4 buttons on one line
-    btn_col1, btn_col2, btn_col3, btn_col4, btn_spacer = st.columns([1, 1, 1, 1, 2])
+    # All 5 buttons on one line (2 filters + 3 actions)
+    btn_col1, btn_col2, btn_col3, btn_col4, btn_col5, btn_spacer = st.columns([1, 1, 1, 1, 1, 1])
 
     with btn_col1:
         # Toggle for positive IV filter
@@ -1055,6 +1057,16 @@ with tab_history:
             st.rerun()
 
     with btn_col2:
+        # Toggle for undervalued (positive discount) filter
+        if st.button(
+            "✓ Undervalued" if st.session_state.show_undervalued_only else "Undervalued",
+            type="primary" if st.session_state.show_undervalued_only else "secondary",
+            use_container_width=True
+        ):
+            st.session_state.show_undervalued_only = not st.session_state.show_undervalued_only
+            st.rerun()
+
+    with btn_col3:
         if st.button("Test DB", type="secondary", use_container_width=True):
             try:
                 st.info(f"Backend: {db_storage.get_storage_backend()}")
@@ -1080,13 +1092,13 @@ with tab_history:
             except Exception as e:
                 st.error(f"Test error: {str(e)}")
 
-    with btn_col3:
+    with btn_col4:
         if st.button("Clear History", type="secondary", use_container_width=True):
             db_storage.clear_all_history()
             st.session_state.analysis_history = []
             st.rerun()
 
-    with btn_col4:
+    with btn_col5:
         if st.button("Refresh", type="secondary", use_container_width=True):
             st.session_state.analysis_history = db_storage.load_all_history(limit=100)
             st.rerun()
@@ -1170,6 +1182,10 @@ with tab_history:
             # Apply positive IV filter (from button toggle)
             if st.session_state.show_positive_iv_only:
                 filtered_df = filtered_df[filtered_df['Intrinsic'] > 0]
+
+            # Apply undervalued filter (positive discount = trading below IV)
+            if st.session_state.show_undervalued_only:
+                filtered_df = filtered_df[filtered_df['Discount'] > 0]
 
             if selected_universe:
                 filtered_df = filtered_df[filtered_df['Universe'].isin(selected_universe)]
