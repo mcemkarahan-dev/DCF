@@ -344,25 +344,30 @@ class BatchScreener:
         return stocks
 
     def _get_roic_universe(self, exchange: str = None) -> List[Dict]:
-        """Get stock universe from ROIC.ai"""
+        """Get stock universe from ROIC.ai, with fallback to built-in list"""
         try:
             tickers = self.fetcher.get_exchange_tickers(exchange)
 
-            stocks = []
-            for ticker in tickers:
-                stocks.append({
-                    'ticker': ticker,
-                    'name': ticker,
-                    'sector': 'N/A',  # Will be fetched later
-                    'exchange': exchange or 'N/A',
-                    'market_cap': 0,
-                    'market_cap_universe': 'Unknown',
-                })
+            if tickers and len(tickers) > 0:
+                stocks = []
+                for ticker in tickers:
+                    stocks.append({
+                        'ticker': ticker,
+                        'name': ticker,
+                        'sector': 'N/A',  # Will be fetched later
+                        'exchange': exchange or 'N/A',
+                        'market_cap': 0,
+                        'market_cap_universe': 'Unknown',
+                    })
+                print(f"Loaded {len(stocks)} stocks from ROIC.ai")
+                return stocks
+            else:
+                print("ROIC.ai returned no tickers, using fallback list")
+                return self._get_yahoo_universe(exchange)
 
-            return stocks
         except Exception as e:
-            print(f"Error fetching ROIC universe: {e}")
-            return []
+            print(f"Error fetching ROIC universe: {e}, using fallback list")
+            return self._get_yahoo_universe(exchange)
 
     def enrich_stock_info(self, stock: Dict) -> Dict:
         """
