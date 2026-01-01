@@ -1395,8 +1395,8 @@ with tab_history:
                 else:
                     last_year = datetime.now().year - 1
 
-                # Layout: 2/3 for charts (2 cols x 3 rows), 1/3 reserved for future use
-                charts_col, future_col = st.columns([2, 1])
+                # Layout: charts on left, spacer, company info on right with border
+                charts_col, spacer_col, info_col = st.columns([1.8, 0.1, 0.6])
 
                 with charts_col:
                     # Row 1: FCF, Revenue
@@ -1465,41 +1465,59 @@ with tab_history:
                         elif not shares_history:
                             st.caption("Shares: No data")
 
-                with future_col:
-                    # Company info panel
-                    st.markdown("#### Company Info")
+                with spacer_col:
+                    pass  # Spacer for visual separation
 
-                    # Company name and sector
+                with info_col:
+                    # Company info panel with gray border
                     company_name = selected_result.get('company_name', selected_ticker)
                     sector = selected_result.get('sector', 'N/A')
                     industry = selected_result.get('industry', 'N/A')
-
-                    st.markdown(f"**{company_name}**")
-                    st.caption(f"{sector} • {industry}")
-
-                    # Key metrics summary
+                    description = selected_result.get('description', '')
                     curr_price = selected_result.get('current_price', 0)
                     intrinsic_val = selected_result.get('intrinsic_value', 0)
                     discount = selected_result.get('discount', 0)
                     mkt_cap = selected_result.get('market_cap', 0)
 
-                    st.markdown("---")
-                    st.metric("Current Price", f"${curr_price:.2f}")
-                    st.metric("Intrinsic Value", f"${intrinsic_val:.2f}")
-
-                    if discount > 0:
-                        st.metric("Discount", f"{discount:.1f}%", delta="Undervalued", delta_color="normal")
-                    else:
-                        st.metric("Premium", f"{abs(discount):.1f}%", delta="Overvalued", delta_color="inverse")
-
-                    st.metric("Market Cap", format_market_cap(mkt_cap))
-
-                    # Company description
-                    description = selected_result.get('description', '')
+                    # Build the info box with border
+                    about_html = ""
                     if description:
-                        st.markdown("---")
-                        st.markdown("**About**")
-                        st.markdown(f"<p style='font-size: 0.85em; color: #64748b;'>{description}</p>", unsafe_allow_html=True)
+                        short_desc = description[:300] + "..." if len(description) > 300 else description
+                        about_html = f"<p style='font-size: 0.8em; color: #64748b; margin-top: 8px;'>{short_desc}</p>"
+
+                    discount_text = f"{discount:.1f}%" if discount > 0 else f"{abs(discount):.1f}%"
+                    discount_label = "Discount" if discount > 0 else "Premium"
+                    discount_color = "#137333" if discount > 0 else "#c5221f"
+                    valuation_text = "Undervalued" if discount > 0 else "Overvalued"
+
+                    info_box_html = f"""
+                    <div style="border: 1px solid #dadce0; border-radius: 8px; padding: 16px; background: #fff;">
+                        <div style="font-weight: 600; font-size: 1.1em; color: #202124;">{company_name}</div>
+                        <div style="font-size: 0.85em; color: #5f6368; margin-bottom: 12px;">{sector} • {industry}</div>
+                        {about_html}
+                        <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 12px 0;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div>
+                                <div style="font-size: 0.75em; color: #5f6368;">Current Price</div>
+                                <div style="font-size: 1.1em; font-weight: 500;">${curr_price:.2f}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75em; color: #5f6368;">Intrinsic Value</div>
+                                <div style="font-size: 1.1em; font-weight: 500;">${intrinsic_val:.2f}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75em; color: #5f6368;">{discount_label}</div>
+                                <div style="font-size: 1.1em; font-weight: 500; color: {discount_color};">{discount_text}</div>
+                                <div style="font-size: 0.7em; color: {discount_color};">↑ {valuation_text}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75em; color: #5f6368;">Market Cap</div>
+                                <div style="font-size: 1.1em; font-weight: 500;">{format_market_cap(mkt_cap)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    """
+                    st.markdown(info_box_html, unsafe_allow_html=True)
 
 # Footer
 st.markdown("---")
