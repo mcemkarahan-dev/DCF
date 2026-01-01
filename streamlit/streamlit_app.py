@@ -202,6 +202,24 @@ st.markdown("""
         margin: 1rem 0;
     }
 
+    /* Logo and header container */
+    .logo-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 1rem;
+    }
+
+    .logo-svg {
+        width: 48px;
+        height: 28px;
+        flex-shrink: 0;
+    }
+
+    .logo-header .main-header {
+        margin-bottom: 0;
+    }
+
     /* ==================== MOBILE RESPONSIVE STYLES ==================== */
     @media (max-width: 768px) {
         /* Reduce padding on mobile */
@@ -438,7 +456,28 @@ def was_recently_analyzed(ticker, params, days=10):
     return False, None
 
 # ==================== HEADER ====================
-st.markdown('<p class="main-header">DCF Stock Analyzer</p>', unsafe_allow_html=True)
+# Logo SVG - two cartoon eyes with connecting curve (white background)
+logo_svg = '''
+<svg class="logo-svg" viewBox="0 0 60 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Connecting curve (brow/bridge) -->
+  <path d="M12 8 Q30 2 48 8" stroke="#3c4043" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Left eye -->
+  <circle cx="14" cy="18" r="11" fill="white" stroke="#3c4043" stroke-width="2"/>
+  <circle cx="14" cy="18" r="4" fill="#202124"/>
+  <circle cx="12" cy="16" r="1.5" fill="white"/>
+  <!-- Right eye -->
+  <circle cx="46" cy="18" r="11" fill="white" stroke="#3c4043" stroke-width="2"/>
+  <circle cx="46" cy="18" r="4" fill="#202124"/>
+  <circle cx="44" cy="16" r="1.5" fill="white"/>
+</svg>
+'''
+
+st.markdown(f'''
+<div class="logo-header">
+    {logo_svg}
+    <p class="main-header">DCF Stock Analyzer</p>
+</div>
+''', unsafe_allow_html=True)
 
 # ==================== MAIN TABS (Google Flights Style) ====================
 tab_analyze, tab_batch, tab_history, tab_settings = st.tabs([
