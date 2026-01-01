@@ -333,6 +333,7 @@ class DCFCalculator:
         if input_type == 'eps_cont_ops':
             # Extract EPS from continuing operations (per share)
             historical_values = []
+            historical_data = []  # List of (year, value) tuples for charting
             print(f"\nExtracting EPS from Continuing Operations:")
             for i, inc in enumerate(income_statements[:10]):
                 eps = inc.get('eps_cont_ops')
@@ -340,52 +341,59 @@ class DCFCalculator:
                 if eps and eps != 0:
                     # Store EPS as-is (per share)
                     historical_values.append(eps)
+                    # Extract year from date (format: YYYY-MM-DD)
+                    year = int(date[:4]) if date != 'N/A' else (2024 - i)
+                    historical_data.append((year, eps))
                     print(f"  {date}: EPS = ${eps:.2f}")
                 else:
                     print(f"  {date}: EPS = 0 or missing")
-            
+
             print(f"\nUsing EPS from Continuing Operations as DCF input ({len(historical_values)} periods)")
             print(f"Note: Projecting per-share growth, will multiply by current shares ({shares:,.0f}) for valuation")
         else:
             # Extract FCF per share (more accurate - accounts for buybacks/dilution)
             historical_values = []
+            historical_data = []  # List of (year, value) tuples for charting
             print(f"\nExtracting Free Cash Flow per Share:")
-            
+
             # Get key metrics for historical shares
             key_metrics = financial_data.get('key_metrics', [])
-            
+
             for i, cf in enumerate(cash_flows[:10]):
                 fcf = cf.get('freeCashFlow')
                 date = cf.get('date', 'N/A')
-                
+
                 # Get shares outstanding for THIS period by matching date
                 period_shares = 0
-                
+
                 # First try to match by date from key_metrics
                 if key_metrics:
                     for metric in key_metrics:
                         if metric.get('date') == date:
                             period_shares = metric.get('numberOfShares', 0) or 0
                             break
-                
+
                 # If not found, try balance sheet (less reliable)
                 if (not period_shares or period_shares == 0) and i < len(balance_sheets):
                     # Try bs_sh_out if it exists in balance sheet
                     period_shares = balance_sheets[i].get('bs_sh_out', 0) or balance_sheets[i].get('numberOfShares', 0) or 0
-                
+
                 # Fall back to current shares if still not found
                 if not period_shares or period_shares == 0:
                     period_shares = shares
-                
+
                 if fcf and fcf != 0 and period_shares > 0:
                     fcf_per_share = fcf / period_shares
                     historical_values.append(fcf_per_share)
+                    # Extract year from date (format: YYYY-MM-DD)
+                    year = int(date[:4]) if date != 'N/A' else (2024 - i)
+                    historical_data.append((year, fcf_per_share))
                     print(f"  {date}: FCF = ${fcf:,.0f}, Shares = {period_shares:,.0f}, FCF/share = ${fcf_per_share:.2f}")
                 elif fcf and fcf != 0:
                     print(f"  {date}: FCF = ${fcf:,.0f} (missing shares data - skipping)")
                 else:
                     print(f"  {date}: FCF = 0 or missing")
-            
+
             print(f"\nUsing FCF per Share as DCF input ({len(historical_values)} periods)")
             print(f"Note: Projecting per-share growth, will multiply by current shares ({shares:,.0f}) for valuation")
         
@@ -418,6 +426,8 @@ class DCFCalculator:
             dcf_result['input_type'] = input_type
             # Flag to indicate if we used per-share values
             dcf_result['is_per_share'] = (input_type in ['eps_cont_ops', 'fcf'])  # Both are per-share now
+            # Add historical data for charting (sorted oldest to newest)
+            dcf_result['historical_data'] = sorted(historical_data, key=lambda x: x[0])
         
         if not dcf_result:
             return None

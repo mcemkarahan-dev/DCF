@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import sys
 import os
+from datetime import datetime
 
 # Add current directory to Python path for Streamlit Cloud compatibility
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -54,6 +55,10 @@ if 'api_key' not in st.session_state:
     st.session_state.api_key = ''
 if 'analysis_result' not in st.session_state:
     st.session_state.analysis_result = None
+if 'analysis_history' not in st.session_state:
+    st.session_state.analysis_history = []  # List of analysis results (max 100)
+if 'selected_ticker' not in st.session_state:
+    st.session_state.selected_ticker = None
 
 # Try to load API key from Streamlit secrets (for persistence)
 def get_saved_api_key():
@@ -64,6 +69,58 @@ def get_saved_api_key():
 
 if 'api_key' not in st.session_state or not st.session_state.api_key:
     st.session_state.api_key = get_saved_api_key()
+
+# Helper functions
+def get_market_cap_universe(mkt_cap):
+    if mkt_cap >= 200e9:
+        return "Mega Cap"
+    elif mkt_cap >= 10e9:
+        return "Large Cap"
+    elif mkt_cap >= 2e9:
+        return "Mid Cap"
+    elif mkt_cap >= 300e6:
+        return "Small Cap"
+    elif mkt_cap >= 50e6:
+        return "Micro Cap"
+    else:
+        return "Nano Cap"
+
+def format_market_cap(mkt_cap):
+    if mkt_cap >= 1e12:
+        return f"${mkt_cap/1e12:.2f}T"
+    elif mkt_cap >= 1e9:
+        return f"${mkt_cap/1e9:.2f}B"
+    elif mkt_cap >= 1e6:
+        return f"${mkt_cap/1e6:.2f}M"
+    else:
+        return f"${mkt_cap:,.0f}"
+
+def format_value(val):
+    if val >= 1e12:
+        return f"${val/1e12:.1f}T"
+    elif val >= 1e9:
+        return f"${val/1e9:.1f}B"
+    elif val >= 1e6:
+        return f"${val/1e6:.1f}M"
+    else:
+        return f"${val:,.0f}"
+
+def add_to_history(result):
+    """Add analysis result to history (newest first, max 100)"""
+    if result is None:
+        return
+
+    # Remove existing entry for same ticker if present
+    st.session_state.analysis_history = [
+        r for r in st.session_state.analysis_history
+        if r['ticker'] != result['ticker']
+    ]
+
+    # Insert at beginning (newest first)
+    st.session_state.analysis_history.insert(0, result)
+
+    # Keep only last 100
+    st.session_state.analysis_history = st.session_state.analysis_history[:100]
 
 # Sidebar - Configuration
 with st.sidebar:
@@ -92,9 +149,9 @@ with st.sidebar:
             st.warning("⚠ API key required for Roic.ai")
     else:
         api_key = "not_needed"
-    
+
     st.markdown("---")
-    
+
     # Parameter Preset
     st.markdown("## 📋 DCF Parameters")
     preset_name = st.selectbox(
@@ -102,18 +159,18 @@ with st.sidebar:
         list(PRESET_CONFIGS.keys()),
         help="Choose a preset or customize below"
     )
-    
+
     preset = PRESET_CONFIGS[preset_name]
-    
+
     # Show preset description
     st.info(f"**{preset['name']}:** {preset['description']}")
-    
+
     # Customization option
     customize = st.checkbox("Customize Parameters")
-    
+
     if customize:
         st.markdown("### Custom Parameters")
-        
+
         wacc = st.number_input(
             "WACC (Discount Rate) %",
             min_value=1.0,
@@ -158,7 +215,7 @@ with st.sidebar:
             step=5.0,
             help="Safety haircut to intrinsic value"
         ) / 100
-        
+
         # Update params
         params = {
             'wacc': wacc,
@@ -172,9 +229,9 @@ with st.sidebar:
         }
     else:
         params = preset.copy()
-    
+
     st.markdown("---")
-    
+
     # Advanced options
     with st.expander("🔧 Advanced Options"):
         input_type = st.radio(
@@ -184,7 +241,7 @@ with st.sidebar:
             format_func=lambda x: "Free Cash Flow per Share" if x == "fcf" else "EPS from Continuing Ops"
         )
         params['dcf_input_type'] = input_type
-        
+
         if "Roic" in data_source:
             years_back = st.number_input(
                 "Years of History",
@@ -197,244 +254,372 @@ with st.sidebar:
         else:
             years_back = 5
 
-# Main content
+# Main content - Header
 st.markdown('<p class="main-header">📊 DCF Stock Analyzer</p>', unsafe_allow_html=True)
 st.markdown("Professional discounted cash flow valuation with 30+ years of historical data")
 
-# Stock input
-col1, col2 = st.columns([3, 1])
+# Create tabs
+tab1, tab2 = st.tabs(["Analyze Stock", "Analysis History"])
 
-with col1:
-    ticker = st.text_input(
-        "Stock Ticker",
-        value="AAPL",
-        max_chars=10,
-        help="Enter stock ticker symbol (e.g., AAPL, MSFT, GOOGL)"
-    ).upper()
+# ==================== TAB 1: Analyze Stock ====================
+with tab1:
+    # Stock input
+    col1, col2 = st.columns([3, 1])
 
-with col2:
-    st.markdown("<br>", unsafe_allow_html=True)  # Spacing
-    analyze_button = st.button("Analyze", type="primary", use_container_width=True)
-
-# Analysis
-if analyze_button:
-    if not ticker:
-        st.error("Please enter a stock ticker")
-    elif "Roic" in data_source and not api_key:
-        st.error("Please enter your Roic.ai API key in the sidebar")
-    else:
-        with st.spinner(f"Analyzing {ticker}..."):
-            try:
-                # Initialize analyzer
-                source = "roic" if "Roic" in data_source else "yahoo"
-                analyzer = DCFAnalyzer(api_key=api_key, data_source=source)
-                
-                # Run analysis
-                result = analyzer.analyze_stock(
-                    ticker,
-                    params=params,
-                    years_back=years_back if "Roic" in data_source else None
-                )
-                
-                st.session_state.analysis_result = result
-                
-            except Exception as e:
-                st.error(f"Error analyzing {ticker}: {str(e)}")
-                st.session_state.analysis_result = None
-
-# Display results
-if st.session_state.analysis_result:
-    result = st.session_state.analysis_result
-    
-    # Company header
-    st.markdown("---")
-
-    # Helper function for market cap universe
-    def get_market_cap_universe(mkt_cap):
-        if mkt_cap >= 200e9:
-            return "Mega Cap"
-        elif mkt_cap >= 10e9:
-            return "Large Cap"
-        elif mkt_cap >= 2e9:
-            return "Mid Cap"
-        elif mkt_cap >= 300e6:
-            return "Small Cap"
-        elif mkt_cap >= 50e6:
-            return "Micro Cap"
-        else:
-            return "Nano Cap"
-
-    def format_market_cap(mkt_cap):
-        if mkt_cap >= 1e12:
-            return f"${mkt_cap/1e12:.2f}T"
-        elif mkt_cap >= 1e9:
-            return f"${mkt_cap/1e9:.2f}B"
-        elif mkt_cap >= 1e6:
-            return f"${mkt_cap/1e6:.2f}M"
-        else:
-            return f"${mkt_cap:,.0f}"
-
-    market_cap = result.get('market_cap', 0)
-    universe = get_market_cap_universe(market_cap)
-    dcf = result['dcf_result']
-    shares = dcf.get('shares_outstanding', 1)
-
-    # Format large numbers helper (1 decimal place)
-    def format_value(val):
-        if val >= 1e12:
-            return f"${val/1e12:.1f}T"
-        elif val >= 1e9:
-            return f"${val/1e9:.1f}B"
-        elif val >= 1e6:
-            return f"${val/1e6:.1f}M"
-        else:
-            return f"${val:,.0f}"
-
-    # === HEADER ROW ===
-    # Columns: Company | Market Cap | Current Price | Intrinsic Value | [reserved]
-    c1, c2, c3, c4, _ = st.columns([1.2, 0.7, 0.7, 0.7, 1.5])
-
-    discount = result['discount']
-
-    with c1:
-        st.markdown(f"### {ticker}")
-        company_name = result.get('company_name', '')
-        sector = result.get('sector', 'N/A')
-        # Company name and sector on same line or tight spacing
-        st.caption(f"{company_name}  •  {sector}")
-
-    with c2:
-        st.metric("Market Cap", format_market_cap(market_cap), universe, delta_color="off")
-
-    with c3:
-        st.metric("Current Price", f"${result['current_price']:.2f}")
-        # Valuation status under price (tight spacing)
-        if discount > 0:
-            st.caption(f":green[Undervalued {discount:.1f}%]")
-        else:
-            st.caption(f":red[Overvalued {abs(discount):.1f}%]")
-
-    with c4:
-        st.metric("Intrinsic Value", f"${result['intrinsic_value']:.2f}")
-
-    st.markdown("---")
-
-    # === KEY METRICS ROW ===
-    # Columns aligned with header: Input Type | Historical Growth | Projected Growth | WACC | [reserved]
-    input_type = result.get('input_type', 'fcf')
-    input_label = "EPS from Cont Ops" if input_type == 'eps_cont_ops' else "FCF per Share"
-
-    c1, c2, c3, c4, _ = st.columns([1.2, 0.7, 0.7, 0.7, 1.5])
-
-    with c1:
-        st.metric("Input Type", input_label, help="What metric is being projected")
-
-    with c2:
-        historical_growth = dcf.get('historical_fcf_growth', 0) * 100
-        years_used = dcf.get('historical_years_used', 5)
-        st.metric(f"Historical Growth ({years_used}yr)", f"{historical_growth:.1f}%", help="Historical CAGR")
-
-    with c3:
-        projected_growth = dcf['params']['fcf_growth_rate'] * 100
-        st.metric("Projected Growth", f"{projected_growth:.1f}%", help="Growth rate used in DCF")
-
-    with c4:
-        wacc = dcf['params']['wacc'] * 100
-        st.metric("WACC", f"{wacc:.1f}%", help="Discount rate")
-
-    st.markdown("---")
-
-    # === VALUATION BREAKDOWN ===
-    # Per-share values from DCF
-    pv_fcf_ps = dcf.get('pv_fcf', 0)
-    pv_terminal_ps = dcf.get('pv_terminal', 0)
-    enterprise_ps = dcf.get('enterprise_value', 0)
-
-    # Calculate totals
-    pv_fcf_total = pv_fcf_ps * shares
-    pv_terminal_total = pv_terminal_ps * shares
-    enterprise_total = enterprise_ps * shares
-    equity_total = dcf.get('equity_value', 0)
-    equity_ps = equity_total / shares if shares else 0
-    intrinsic_ps = result['intrinsic_value']
-    intrinsic_total = intrinsic_ps * shares
-
-    # Columns aligned with rows above: [1.2] | [0.7] | [0.7] | [0.7] | [reserved]
-    c1, c2, c3, c4, _ = st.columns([1.2, 0.7, 0.7, 0.7, 1.5])
-
-    with c1:
-        st.markdown("**Valuation Breakdown**")
-        st.metric("PV of Projected Cash Flows", format_value(pv_fcf_total), f"${pv_fcf_ps:.1f}/sh")
-        st.metric("PV of Terminal Value", format_value(pv_terminal_total), f"${pv_terminal_ps:.1f}/sh")
-        st.metric("Enterprise Value", format_value(enterprise_total), f"${enterprise_ps:.1f}/sh")
-
-    with c2:
-        st.markdown("&nbsp;")  # Spacer to align with header
-        st.metric("Equity Value", format_value(equity_total), f"${equity_ps:.1f}/sh")
-        st.metric("Intrinsic Value", format_value(intrinsic_total), f"${intrinsic_ps:.1f}/sh")
-        st.metric("Shares Outstanding", f"{shares/1e9:.1f}B" if shares >= 1e9 else f"{shares/1e6:.0f}M")
-
-    # DCF Parameters used
-    with st.expander("📋 DCF Parameters Used"):
-        params_df = pd.DataFrame({
-            'Parameter': [
-                'WACC (Discount Rate)',
-                'Terminal Growth Rate',
-                f'{input_label} Growth Rate',
-                'Projection Years',
-                'Margin of Safety'
-            ],
-            'Value': [
-                f"{result['dcf_result']['params']['wacc']*100:.1f}%",
-                f"{result['dcf_result']['params']['terminal_growth_rate']*100:.1f}%",
-                f"{result['dcf_result']['params']['fcf_growth_rate']*100:.1f}%",
-                f"{result['dcf_result']['params']['projection_years']}",
-                f"{result['dcf_result']['params']['conservative_adjustment']*100:.1f}%"
-            ]
-        })
-        st.dataframe(params_df, hide_index=True, use_container_width=True)
-
-else:
-    # Welcome message
-    st.info("👆 Enter a stock ticker and click 'Analyze' to begin")
-    
-    # Feature highlights
-    st.markdown("### ✨ Features")
-    
-    col1, col2, col3 = st.columns(3)
-    
     with col1:
-        st.markdown("""
-        **📊 Accurate DCF Model**
-        - Per-share FCF/EPS projections
-        - Accounts for buybacks
-        - 2-stage growth model
-        - Gordon Growth terminal value
-        """)
-    
+        ticker = st.text_input(
+            "Stock Ticker",
+            value="AAPL",
+            max_chars=10,
+            help="Enter stock ticker symbol (e.g., AAPL, MSFT, GOOGL)"
+        ).upper()
+
     with col2:
-        st.markdown("""
-        **📈 30+ Years of Data**
-        - Roic.ai integration
-        - Historical FCF/EPS tracking
-        - Free Yahoo Finance option
-        - Automated data fetching
-        """)
-    
-    with col3:
-        st.markdown("""
-        **⚙️ Fully Customizable**
-        - 5 built-in presets
-        - Custom parameters
-        - Multiple DCF inputs
-        - Margin of safety
-        """)
+        st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+        analyze_button = st.button("Analyze", type="primary", use_container_width=True)
+
+    # Analysis
+    if analyze_button:
+        if not ticker:
+            st.error("Please enter a stock ticker")
+        elif "Roic" in data_source and not api_key:
+            st.error("Please enter your Roic.ai API key in the sidebar")
+        else:
+            with st.spinner(f"Analyzing {ticker}..."):
+                try:
+                    # Initialize analyzer
+                    source = "roic" if "Roic" in data_source else "yahoo"
+                    analyzer = DCFAnalyzer(api_key=api_key, data_source=source)
+
+                    # Run analysis
+                    result = analyzer.analyze_stock(
+                        ticker,
+                        params=params,
+                        years_back=years_back if "Roic" in data_source else None
+                    )
+
+                    st.session_state.analysis_result = result
+
+                    # Add to history
+                    add_to_history(result)
+
+                except Exception as e:
+                    st.error(f"Error analyzing {ticker}: {str(e)}")
+                    st.session_state.analysis_result = None
+
+    # Display results
+    if st.session_state.analysis_result:
+        result = st.session_state.analysis_result
+
+        # Company header
+        st.markdown("---")
+
+        market_cap = result.get('market_cap', 0)
+        universe = get_market_cap_universe(market_cap)
+        dcf = result['dcf_result']
+        shares = dcf.get('shares_outstanding', 1)
+
+        # === HEADER ROW ===
+        c1, c2, c3, c4, _ = st.columns([1.2, 0.7, 0.7, 0.7, 1.5])
+
+        discount = result['discount']
+
+        with c1:
+            st.markdown(f"### {result['ticker']}")
+            company_name = result.get('company_name', '')
+            sector = result.get('sector', 'N/A')
+            st.caption(f"{company_name}  •  {sector}")
+
+        with c2:
+            st.metric("Market Cap", format_market_cap(market_cap), universe, delta_color="off")
+
+        with c3:
+            st.metric("Current Price", f"${result['current_price']:.2f}")
+            if discount > 0:
+                st.caption(f":green[Undervalued {discount:.1f}%]")
+            else:
+                st.caption(f":red[Overvalued {abs(discount):.1f}%]")
+
+        with c4:
+            st.metric("Intrinsic Value", f"${result['intrinsic_value']:.2f}")
+
+        st.markdown("---")
+
+        # === KEY METRICS ROW ===
+        input_type_display = result.get('input_type', 'fcf')
+        input_label = "EPS from Cont Ops" if input_type_display == 'eps_cont_ops' else "FCF per Share"
+
+        c1, c2, c3, c4, _ = st.columns([1.2, 0.7, 0.7, 0.7, 1.5])
+
+        with c1:
+            st.metric("Input Type", input_label, help="What metric is being projected")
+
+        with c2:
+            historical_growth = dcf.get('historical_fcf_growth', 0) * 100
+            years_used = dcf.get('historical_years_used', 5)
+            st.metric(f"Historical Growth ({years_used}yr)", f"{historical_growth:.1f}%", help="Historical CAGR")
+
+        with c3:
+            projected_growth = dcf['params']['fcf_growth_rate'] * 100
+            st.metric("Projected Growth", f"{projected_growth:.1f}%", help="Growth rate used in DCF")
+
+        with c4:
+            wacc_display = dcf['params']['wacc'] * 100
+            st.metric("WACC", f"{wacc_display:.1f}%", help="Discount rate")
+
+        st.markdown("---")
+
+        # === VALUATION BREAKDOWN ===
+        pv_fcf_ps = dcf.get('pv_fcf', 0)
+        pv_terminal_ps = dcf.get('pv_terminal', 0)
+        enterprise_ps = dcf.get('enterprise_value', 0)
+
+        pv_fcf_total = pv_fcf_ps * shares
+        pv_terminal_total = pv_terminal_ps * shares
+        enterprise_total = enterprise_ps * shares
+        equity_total = dcf.get('equity_value', 0)
+        equity_ps = equity_total / shares if shares else 0
+        intrinsic_ps = result['intrinsic_value']
+        intrinsic_total = intrinsic_ps * shares
+
+        c1, c2, c3, c4, _ = st.columns([1.2, 0.7, 0.7, 0.7, 1.5])
+
+        with c1:
+            st.markdown("**Valuation Breakdown**")
+            st.metric("PV of Projected Cash Flows", format_value(pv_fcf_total), f"${pv_fcf_ps:.1f}/sh")
+            st.metric("PV of Terminal Value", format_value(pv_terminal_total), f"${pv_terminal_ps:.1f}/sh")
+            st.metric("Enterprise Value", format_value(enterprise_total), f"${enterprise_ps:.1f}/sh")
+
+        with c2:
+            st.markdown("&nbsp;")
+            st.metric("Equity Value", format_value(equity_total), f"${equity_ps:.1f}/sh")
+            st.metric("Intrinsic Value", format_value(intrinsic_total), f"${intrinsic_ps:.1f}/sh")
+            st.metric("Shares Outstanding", f"{shares/1e9:.1f}B" if shares >= 1e9 else f"{shares/1e6:.0f}M")
+
+        # DCF Parameters used
+        with st.expander("📋 DCF Parameters Used"):
+            params_df = pd.DataFrame({
+                'Parameter': [
+                    'WACC (Discount Rate)',
+                    'Terminal Growth Rate',
+                    f'{input_label} Growth Rate',
+                    'Projection Years',
+                    'Margin of Safety'
+                ],
+                'Value': [
+                    f"{result['dcf_result']['params']['wacc']*100:.1f}%",
+                    f"{result['dcf_result']['params']['terminal_growth_rate']*100:.1f}%",
+                    f"{result['dcf_result']['params']['fcf_growth_rate']*100:.1f}%",
+                    f"{result['dcf_result']['params']['projection_years']}",
+                    f"{result['dcf_result']['params']['conservative_adjustment']*100:.1f}%"
+                ]
+            })
+            st.dataframe(params_df, hide_index=True, use_container_width=True)
+
+    else:
+        # Welcome message
+        st.info("👆 Enter a stock ticker and click 'Analyze' to begin")
+
+        # Feature highlights
+        st.markdown("### ✨ Features")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.markdown("""
+            **📊 Accurate DCF Model**
+            - Per-share FCF/EPS projections
+            - Accounts for buybacks
+            - 2-stage growth model
+            - Gordon Growth terminal value
+            """)
+
+        with col2:
+            st.markdown("""
+            **📈 30+ Years of Data**
+            - Roic.ai integration
+            - Historical FCF/EPS tracking
+            - Free Yahoo Finance option
+            - Automated data fetching
+            """)
+
+        with col3:
+            st.markdown("""
+            **⚙️ Fully Customizable**
+            - 5 built-in presets
+            - Custom parameters
+            - Multiple DCF inputs
+            - Margin of safety
+            """)
+
+# ==================== TAB 2: Analysis History ====================
+with tab2:
+    if not st.session_state.analysis_history:
+        st.info("No analyses yet. Analyze some stocks in the 'Analyze Stock' tab to see them here.")
+    else:
+        # Build Table 1 data
+        history_data = []
+        for r in st.session_state.analysis_history:
+            dcf_r = r.get('dcf_result', {})
+            params_r = dcf_r.get('params', {})
+            shares_r = dcf_r.get('shares_outstanding', 1)
+
+            history_data.append({
+                'Ticker': r.get('ticker', ''),
+                'WACC %': f"{params_r.get('wacc', 0) * 100:.1f}",
+                'Terminal Growth %': f"{params_r.get('terminal_growth_rate', 0) * 100:.1f}",
+                'FCF Growth %': f"{params_r.get('fcf_growth_rate', 0) * 100:.1f}",
+                'Proj Years': params_r.get('projection_years', 0),
+                'Margin of Safety %': f"{params_r.get('conservative_adjustment', 0) * 100:.1f}",
+                'Intrinsic/Share': f"${r.get('intrinsic_value', 0):.2f}",
+                'Total Intrinsic': format_value(r.get('intrinsic_value', 0) * shares_r),
+                'Price/Share': f"${r.get('current_price', 0):.2f}",
+                'Market Cap': format_market_cap(r.get('market_cap', 0)),
+                'Discount %': f"{r.get('discount', 0):+.1f}%"
+            })
+
+        # Pad to 100 rows
+        while len(history_data) < 100:
+            history_data.append({
+                'Ticker': '',
+                'WACC %': '',
+                'Terminal Growth %': '',
+                'FCF Growth %': '',
+                'Proj Years': '',
+                'Margin of Safety %': '',
+                'Intrinsic/Share': '',
+                'Total Intrinsic': '',
+                'Price/Share': '',
+                'Market Cap': '',
+                'Discount %': ''
+            })
+
+        history_df = pd.DataFrame(history_data)
+
+        # ===== TOP HALF: Table 1 with selection =====
+        st.markdown("### Analysis History")
+        st.caption("Click on a row to view detailed historical and projected data below")
+
+        # Get list of tickers for selection
+        ticker_options = [r['ticker'] for r in st.session_state.analysis_history]
+
+        # Selection mechanism
+        selected_ticker = st.selectbox(
+            "Select Ticker for Details",
+            options=ticker_options,
+            index=0 if ticker_options else None,
+            key="history_ticker_select"
+        )
+
+        # Style the dataframe to highlight selected row
+        def highlight_selected(row):
+            if row['Ticker'] == selected_ticker:
+                return ['background-color: #ffff99'] * len(row)
+            return [''] * len(row)
+
+        styled_df = history_df.style.apply(highlight_selected, axis=1)
+
+        # Display Table 1 (fixed height for ~50% of screen)
+        st.dataframe(
+            styled_df,
+            hide_index=True,
+            use_container_width=True,
+            height=400  # Approximately half screen height
+        )
+
+        st.markdown("---")
+
+        # ===== BOTTOM HALF: Table 2 and Chart 1 =====
+        if selected_ticker:
+            # Find the selected result
+            selected_result = None
+            for r in st.session_state.analysis_history:
+                if r['ticker'] == selected_ticker:
+                    selected_result = r
+                    break
+
+            if selected_result:
+                dcf_selected = selected_result.get('dcf_result', {})
+                input_type_sel = dcf_selected.get('input_type', 'fcf')
+                input_label_sel = "EPS" if input_type_sel == 'eps_cont_ops' else "FCF/Share"
+
+                # Get historical data
+                historical_data = dcf_selected.get('historical_data', [])
+
+                # Get projected data
+                fcf_projections = dcf_selected.get('fcf_projections', [])
+
+                # Determine years
+                if historical_data:
+                    last_historical_year = max(h[0] for h in historical_data)
+                else:
+                    last_historical_year = datetime.now().year - 1
+
+                # Build combined data for Table 2 and Chart 1
+                years = []
+                values = []
+                types = []  # 'Historical' or 'Projected'
+
+                # Add historical data (sorted by year)
+                for year, value in sorted(historical_data, key=lambda x: x[0]):
+                    years.append(str(year))
+                    values.append(value)
+                    types.append('Historical')
+
+                # Add projected data
+                for i, proj_value in enumerate(fcf_projections):
+                    proj_year = last_historical_year + i + 1
+                    years.append(str(proj_year))
+                    values.append(proj_value)
+                    types.append('Projected')
+
+                # Table 2: Historical + Projected by year
+                st.markdown(f"### {selected_ticker} - {input_label_sel} by Year")
+
+                if years:
+                    # Create Table 2 data (1 header row + 1 data row)
+                    table2_data = {year: f"${val:.2f}" for year, val in zip(years, values)}
+                    table2_df = pd.DataFrame([table2_data])
+
+                    st.dataframe(
+                        table2_df,
+                        hide_index=True,
+                        use_container_width=True
+                    )
+
+                    # Chart 1: Visual representation
+                    st.markdown(f"### {input_label_sel} Trend")
+
+                    # Create chart data
+                    chart_df = pd.DataFrame({
+                        'Year': years,
+                        input_label_sel: values,
+                        'Type': types
+                    })
+
+                    # Use different colors for historical vs projected
+                    import altair as alt
+
+                    chart = alt.Chart(chart_df).mark_bar().encode(
+                        x=alt.X('Year:N', sort=None, title='Year'),
+                        y=alt.Y(f'{input_label_sel}:Q', title=f'{input_label_sel} ($)'),
+                        color=alt.Color('Type:N',
+                                       scale=alt.Scale(domain=['Historical', 'Projected'],
+                                                      range=['#1f77b4', '#ff7f0e']),
+                                       legend=alt.Legend(title='Data Type'))
+                    ).properties(
+                        height=300
+                    )
+
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.warning("No historical or projected data available for this ticker.")
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666; font-size: 0.9rem;'>
-    DCF Stock Analyzer | Built with Streamlit | 
+    DCF Stock Analyzer | Built with Streamlit |
     <a href='https://github.com/mcemkarahan-dev/DCF'>GitHub</a>
 </div>
 """, unsafe_allow_html=True)
