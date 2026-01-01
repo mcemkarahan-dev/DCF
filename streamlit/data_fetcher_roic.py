@@ -55,11 +55,11 @@ class RoicDataFetcher:
             }
         
         profile = data[0]
-        
+
         return {
             'symbol': profile.get('ticker') or ticker,
-            'companyName': profile.get('name') or ticker,
-            'exchangeShortName': profile.get('exchange_name') or 'N/A',
+            'companyName': profile.get('company_name') or ticker,
+            'exchangeShortName': profile.get('exchange_short_name') or profile.get('exchange') or 'N/A',
             'sector': profile.get('sector') or 'N/A',
             'industry': profile.get('industry') or 'N/A',
             'mktCap': 0  # Will calculate from price * shares if needed
@@ -364,9 +364,7 @@ class RoicDataFetcher:
             print(f"Warning: Could not fetch current price: {e}")
             current_price = None
         
-        # Update profile with actual company name if available
-        if income_statements and len(income_statements) > 0:
-            profile['companyName'] = ticker  # Roic returns ticker, not full name
+        # Keep profile company name from API (don't override with ticker)
         
         return {
             'ticker': ticker,

@@ -871,9 +871,11 @@ with tab_batch:
         else:
             progress_bar = st.progress(0)
             status_text = st.empty()
+            stats_display = st.empty()
             matched_display = st.empty()
 
             matched_tickers = []
+            checked_count = [0]  # Use list to allow mutation in nested function
 
             try:
                 source = "roic" if "Roic" in data_source else "yahoo"
@@ -884,10 +886,21 @@ with tab_batch:
                     pct = int((current / total) * 100) if total > 0 else 0
                     progress_bar.progress(pct / 100)
                     status_text.text(message)
+                    # Update checked count during filtering phase
+                    if is_filtering:
+                        checked_count[0] = current
+                        match_pct = (len(matched_tickers) / current * 100) if current > 0 else 0
+                        stats_display.markdown(
+                            f"**Checked:** {current:,} | **Matched:** {len(matched_tickers)} | **Match Rate:** {match_pct:.1f}%"
+                        )
 
                 def on_match(stock):
                     matched_tickers.append(stock['ticker'])
-                    matched_display.success(f"**Matched ({len(matched_tickers)}):** {', '.join(matched_tickers)}")
+                    match_pct = (len(matched_tickers) / checked_count[0] * 100) if checked_count[0] > 0 else 0
+                    stats_display.markdown(
+                        f"**Checked:** {checked_count[0]:,} | **Matched:** {len(matched_tickers)} | **Match Rate:** {match_pct:.1f}%"
+                    )
+                    matched_display.success(f"**Matched Tickers:** {', '.join(matched_tickers)}")
 
                 # Screen stocks
                 status_text.text("Screening stocks...")
