@@ -95,21 +95,24 @@ class RoicDataFetcher:
                 except (ValueError, TypeError):
                     return 0
             
-            # Debug: uncomment to see field names
-            # if len(results) == 0:
-            #     print(f"DEBUG - Income statement fields: {list(item.keys())[:10]}")
-            
+            # Debug: show field names for first record
+            if len(results) == 0:
+                print(f"DEBUG - Income statement fields: {list(item.keys())}")
+
             # Roic.ai uses different field names
             revenue = to_float(
-                item.get('is_sales_revenue_turnover') or 
+                item.get('is_sales_revenue_turnover') or
                 item.get('is_sales_and_services_revenues') or
-                item.get('revenue') or 
+                item.get('revenue') or
                 item.get('totalRevenue')
             )
-            
+
+            # Operating income / EBIT - roic.ai uses is_oper_income
             operating_income = to_float(
+                item.get('is_oper_income') or
                 item.get('is_operating_income') or
-                item.get('operatingIncome')
+                item.get('operatingIncome') or
+                item.get('ebit')
             )
             
             net_income = to_float(
@@ -230,10 +233,10 @@ class RoicDataFetcher:
                 except (ValueError, TypeError):
                     return 0
             
-            # Debug: uncomment to see field names
-            # if len(results) == 0:
-            #     print(f"DEBUG - Cash flow fields: {list(item.keys())[:10]}")
-            
+            # Debug: show field names for first record
+            if len(results) == 0:
+                print(f"DEBUG - Cash flow fields: {list(item.keys())}")
+
             # Roic.ai uses different field names
             operating_cf = to_float(
                 item.get('cf_cash_from_operating_activities') or
@@ -258,12 +261,12 @@ class RoicDataFetcher:
                     capex = -capex
                 fcf = operating_cf + capex
 
-            # Dividends paid (usually negative in cash flow statement)
+            # Dividends paid - roic.ai uses cf_dvd_paid
             dividends = to_float(
+                item.get('cf_dvd_paid') or
                 item.get('cf_dividends_paid') or
                 item.get('cf_div_paid') or
-                item.get('dividendsPaid') or
-                item.get('commonStockDividendPaid') or 0
+                item.get('dividendsPaid') or 0
             )
 
             results.append({

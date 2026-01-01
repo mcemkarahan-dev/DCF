@@ -1458,7 +1458,12 @@ with tab_history:
 
                 # Get data from dcf_result
                 historical_data = dcf_selected.get('historical_data', [])
-                fcf_projections = dcf_selected.get('fcf_projections', [])
+                fcf_projections_per_share = dcf_selected.get('fcf_projections', [])
+                shares_outstanding = dcf_selected.get('shares_outstanding', 1)
+
+                # Convert per-share projections to total FCF
+                fcf_projections = [proj * shares_outstanding for proj in fcf_projections_per_share] if fcf_projections_per_share else []
+
                 total_fcf_history = dcf_selected.get('total_fcf_history', [])
                 revenue_history = dcf_selected.get('revenue_history', [])
                 ebit_history = dcf_selected.get('ebit_history', [])
