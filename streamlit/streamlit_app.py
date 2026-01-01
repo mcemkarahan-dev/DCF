@@ -1258,7 +1258,30 @@ with tab_history:
                 input_type_sel = dcf_selected.get('input_type', 'fcf')
                 input_label = "EPS" if input_type_sel == 'eps_cont_ops' else "FCF/Share"
 
-                st.markdown(f"### {selected_ticker} - Financial History")
+                # Header with Re-Analyze button
+                header_col, btn_col = st.columns([3, 1])
+                with header_col:
+                    st.markdown(f"### {selected_ticker} - Financial History")
+                with btn_col:
+                    if st.button("🔄 Re-Analyze", key="reanalyze_btn", use_container_width=True):
+                        # Get current settings
+                        reanalyze_data_source = st.session_state.get('data_source', "Roic.ai (30+ years)")
+                        reanalyze_api_key = st.session_state.get('api_key', '')
+                        reanalyze_params = st.session_state.get('custom_params', PRESET_CONFIGS['conservative'])
+
+                        with st.spinner(f"Re-analyzing {selected_ticker}..."):
+                            try:
+                                source = "roic" if "Roic" in reanalyze_data_source else "yahoo"
+                                analyzer = DCFAnalyzer(api_key=reanalyze_api_key, data_source=source)
+                                new_result = analyzer.analyze_stock(selected_ticker, params=reanalyze_params)
+                                if new_result:
+                                    add_to_history(new_result, reanalyze_params)
+                                    st.success(f"✓ {selected_ticker} re-analyzed successfully!")
+                                    st.rerun()
+                                else:
+                                    st.error(f"Failed to re-analyze {selected_ticker}")
+                            except Exception as e:
+                                st.error(f"Error: {str(e)}")
 
                 # Modern, understated color palette
                 COLOR_HISTORICAL = '#64748b'      # Slate gray for historical bars
