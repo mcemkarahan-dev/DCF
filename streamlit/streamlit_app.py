@@ -456,12 +456,13 @@ def was_recently_analyzed(ticker, params, days=10):
     return False, None
 
 # ==================== HEADER ====================
-# Logo and branding using Streamlit columns
-logo_col, brand_col, spacer_col = st.columns([0.08, 0.4, 0.52])
-
-with logo_col:
-    # Display logo as inline SVG via markdown
-    st.markdown('''<svg viewBox="0 0 60 32" width="48" height="28" xmlns="http://www.w3.org/2000/svg">
+# Logo and branding in single HTML block for tight positioning
+st.markdown('''
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@700&display=swap');
+</style>
+<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem;">
+    <svg viewBox="0 0 60 32" width="44" height="26" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 8 Q30 2 48 8" stroke="#3c4043" stroke-width="2.5" fill="none" stroke-linecap="round"/>
         <circle cx="14" cy="18" r="11" fill="white" stroke="#3c4043" stroke-width="2"/>
         <circle cx="14" cy="18" r="4" fill="#202124"/>
@@ -469,10 +470,10 @@ with logo_col:
         <circle cx="46" cy="18" r="11" fill="white" stroke="#3c4043" stroke-width="2"/>
         <circle cx="46" cy="18" r="4" fill="#202124"/>
         <circle cx="44" cy="16" r="1.5" fill="white"/>
-    </svg>''', unsafe_allow_html=True)
-
-with brand_col:
-    st.markdown("**Cem's DCF Screener**")
+    </svg>
+    <span style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 1.25rem; color: #1a73e8; letter-spacing: -0.5px;">Cem's DCF Screener</span>
+</div>
+''', unsafe_allow_html=True)
 
 # ==================== MAIN TABS (Google Flights Style) ====================
 tab_analyze, tab_batch, tab_history, tab_settings = st.tabs([
