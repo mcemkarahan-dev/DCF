@@ -70,9 +70,12 @@ def _supabase_save_analysis(result: Dict, params_hash: int = None):
         }
 
         # Upsert - update if exists, insert if not
-        client.table('analysis_history').upsert(data, on_conflict='ticker').execute()
+        response = client.table('analysis_history').upsert(data, on_conflict='ticker').execute()
+        print(f"Supabase save success: {ticker}")
     except Exception as e:
-        print(f"Supabase save error: {e}")
+        print(f"Supabase save error for {result.get('ticker', 'unknown')}: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def _supabase_load_all_history(limit: int = 100) -> List[Dict]:
@@ -86,17 +89,21 @@ def _supabase_load_all_history(limit: int = 100) -> List[Dict]:
             .limit(limit) \
             .execute()
 
+        print(f"Supabase load: got {len(response.data)} rows")
+
         history = []
         for row in response.data:
             try:
                 result = json.loads(row['result_json'])
                 history.append(result)
-            except (json.JSONDecodeError, KeyError):
-                pass
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"Supabase parse error: {e}")
 
         return history
     except Exception as e:
         print(f"Supabase load error: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
