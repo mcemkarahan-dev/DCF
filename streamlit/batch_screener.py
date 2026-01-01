@@ -5,6 +5,7 @@ Designed for extensibility - easy to add new filter types
 """
 
 import yfinance as yf
+import requests
 from typing import List, Dict, Optional, Callable, Any, Generator
 from dataclasses import dataclass, field
 from enum import Enum
@@ -380,8 +381,8 @@ class BatchScreener:
 
         # Micro Cap stocks ($50M - $300M) with exchanges
         MICRO_CAP_STOCKS = [
+            # NASDAQ Micro Caps
             ('SMSI', 'Smith Micro', 'Technology', 'NASDAQ'),
-            ('INUV', 'Inuvo Inc.', 'Technology', 'AMEX'),
             ('CUEN', 'Cuentas Inc.', 'Technology', 'NASDAQ'),
             ('QNRX', 'Quoin Pharma', 'Healthcare', 'NASDAQ'),
             ('BIOR', 'Biora Therapeutics', 'Healthcare', 'NASDAQ'),
@@ -390,26 +391,104 @@ class BatchScreener:
             ('OCGN', 'Ocugen Inc.', 'Healthcare', 'NASDAQ'),
             ('SNES', 'SenesTech', 'Healthcare', 'NASDAQ'),
             ('CTSO', 'Cytosorbents', 'Healthcare', 'NASDAQ'),
-            ('GRAY', 'Graybug Vision', 'Healthcare', 'NASDAQ'),
-            ('ARDS', 'Aridis Pharma', 'Healthcare', 'NASDAQ'),
-            ('ARQT', 'Arcus Biosciences', 'Healthcare', 'NYSE'),
             ('NVAX', 'Novavax', 'Healthcare', 'NASDAQ'),
             ('IOVA', 'Iovance Bio', 'Healthcare', 'NASDAQ'),
             ('SAVA', 'Cassava Sciences', 'Healthcare', 'NASDAQ'),
             ('MNKD', 'MannKind Corp.', 'Healthcare', 'NASDAQ'),
-            ('XERS', 'Xeris Biopharma', 'Healthcare', 'NASDAQ'),
-            ('APLS', 'Apellis Pharma', 'Healthcare', 'NASDAQ'),
-            ('ALXO', 'ALX Oncology', 'Healthcare', 'NASDAQ'),
-            ('AUTL', 'Autolus Therapeutics', 'Healthcare', 'NASDAQ'),
-            ('JSPR', 'Jasper Therapeutics', 'Healthcare', 'NASDAQ'),
-            ('PMVP', 'PMV Pharma', 'Healthcare', 'NASDAQ'),
-            ('ROIV', 'Roivant Sciences', 'Healthcare', 'NASDAQ'),
-            ('SLDB', 'Solid Biosciences', 'Healthcare', 'NASDAQ'),
-            ('TSHA', 'Taysha Gene', 'Healthcare', 'NASDAQ'),
-            ('VCNX', 'Vaccinex', 'Healthcare', 'NASDAQ'),
             ('VERU', 'Veru Inc.', 'Healthcare', 'NASDAQ'),
             ('VYGR', 'Voyager Therapeutics', 'Healthcare', 'NASDAQ'),
-            ('CLVR', 'Clever Leaves', 'Healthcare', 'NASDAQ'),
+            # NYSE Micro Caps
+            ('BTG', 'B2Gold Corp', 'Basic Materials', 'NYSE'),
+            ('HL', 'Hecla Mining', 'Basic Materials', 'NYSE'),
+            ('CDE', 'Coeur Mining', 'Basic Materials', 'NYSE'),
+            ('EGO', 'Eldorado Gold', 'Basic Materials', 'NYSE'),
+            ('AG', 'First Majestic Silver', 'Basic Materials', 'NYSE'),
+            ('PAAS', 'Pan American Silver', 'Basic Materials', 'NYSE'),
+            ('NGD', 'New Gold Inc', 'Basic Materials', 'NYSE'),
+            ('FSM', 'Fortuna Silver', 'Basic Materials', 'NYSE'),
+            ('USAS', 'Americas Gold Silver', 'Basic Materials', 'NYSE'),
+            ('GPL', 'Great Panther Mining', 'Basic Materials', 'NYSE'),
+            ('MUX', 'McEwen Mining', 'Basic Materials', 'NYSE'),
+            ('THM', 'International Tower Hill', 'Basic Materials', 'NYSE'),
+            ('GATO', 'Gatos Silver', 'Basic Materials', 'NYSE'),
+            ('SVM', 'Silvercorp Metals', 'Basic Materials', 'NYSE'),
+            ('ASM', 'Avino Silver Gold', 'Basic Materials', 'NYSE'),
+            ('REI', 'Ring Energy', 'Energy', 'NYSE'),
+            ('SD', 'SandRidge Energy', 'Energy', 'NYSE'),
+            ('NEXT', 'NextDecade Corp', 'Energy', 'NYSE'),
+            ('NGL', 'NGL Energy Partners', 'Energy', 'NYSE'),
+            ('PBF', 'PBF Energy', 'Energy', 'NYSE'),
+            ('PUMP', 'ProPetro Holding', 'Energy', 'NYSE'),
+            ('CPE', 'Callon Petroleum', 'Energy', 'NYSE'),
+            ('CIVI', 'Civitas Resources', 'Energy', 'NYSE'),
+            ('HPK', 'HighPeak Energy', 'Energy', 'NYSE'),
+            ('GTE', 'Gran Tierra Energy', 'Energy', 'NYSE'),
+            ('OII', 'Oceaneering Intl', 'Energy', 'NYSE'),
+            ('BORR', 'Borr Drilling', 'Energy', 'NYSE'),
+            ('VAL', 'Valaris Ltd', 'Energy', 'NYSE'),
+            ('RIG', 'Transocean Ltd', 'Energy', 'NYSE'),
+            ('GTN', 'Gray Television', 'Communication Services', 'NYSE'),
+            ('MSGS', 'Madison Square Garden', 'Communication Services', 'NYSE'),
+            ('EVC', 'Entravision Comms', 'Communication Services', 'NYSE'),
+            ('SSP', 'E.W. Scripps', 'Communication Services', 'NYSE'),
+            ('GCI', 'Gannett Co', 'Communication Services', 'NYSE'),
+            ('NYT', 'New York Times', 'Communication Services', 'NYSE'),
+            ('CMCSA', 'Comcast Corp', 'Communication Services', 'NYSE'),
+            ('AHH', 'Armada Hoffler', 'Real Estate', 'NYSE'),
+            ('LAND', 'Gladstone Land', 'Real Estate', 'NYSE'),
+            ('GOOD', 'Gladstone Commercial', 'Real Estate', 'NYSE'),
+            ('ORC', 'Orchid Island Cap', 'Real Estate', 'NYSE'),
+            ('TWO', 'Two Harbors Inv', 'Real Estate', 'NYSE'),
+            ('NYMT', 'New York Mortgage', 'Real Estate', 'NYSE'),
+            ('MFA', 'MFA Financial', 'Real Estate', 'NYSE'),
+            ('CIM', 'Chimera Investment', 'Real Estate', 'NYSE'),
+            ('BXMT', 'Blackstone Mortgage', 'Real Estate', 'NYSE'),
+            ('RC', 'Ready Capital', 'Real Estate', 'NYSE'),
+            ('TRTX', 'TPG RE Finance', 'Real Estate', 'NYSE'),
+            ('KREF', 'KKR Real Estate', 'Real Estate', 'NYSE'),
+            ('BGS', 'B&G Foods', 'Consumer Defensive', 'NYSE'),
+            ('THS', 'TreeHouse Foods', 'Consumer Defensive', 'NYSE'),
+            ('JBSS', 'John B Sanfilippo', 'Consumer Defensive', 'NYSE'),
+            ('CENTA', 'Central Garden Pet', 'Consumer Defensive', 'NYSE'),
+            ('SENEA', 'Seneca Foods', 'Consumer Defensive', 'NYSE'),
+            ('HRL', 'Hormel Foods', 'Consumer Defensive', 'NYSE'),
+            # AMEX Micro Caps
+            ('INUV', 'Inuvo Inc.', 'Technology', 'AMEX'),
+            ('BTN', 'Ballantyne Strong', 'Technology', 'AMEX'),
+            ('PETZ', 'TDH Holdings', 'Consumer Cyclical', 'AMEX'),
+            ('REED', 'Reeds Inc', 'Consumer Defensive', 'AMEX'),
+            ('HUSA', 'Houston American Energy', 'Energy', 'AMEX'),
+            ('EPM', 'Evolution Petroleum', 'Energy', 'AMEX'),
+            ('USEG', 'US Energy Corp', 'Energy', 'AMEX'),
+            ('SNMP', 'Sanchez Midstream', 'Energy', 'AMEX'),
+            ('GORO', 'Gold Resource Corp', 'Basic Materials', 'AMEX'),
+            ('GSS', 'Golden Star Resources', 'Basic Materials', 'AMEX'),
+            ('TGB', 'Taseko Mines', 'Basic Materials', 'AMEX'),
+            ('SAND', 'Sandstorm Gold', 'Basic Materials', 'AMEX'),
+            ('EXK', 'Endeavour Silver', 'Basic Materials', 'AMEX'),
+            ('SILV', 'SilverCrest Metals', 'Basic Materials', 'AMEX'),
+            ('AXU', 'Alexco Resource', 'Basic Materials', 'AMEX'),
+            ('USAU', 'US Gold Corp', 'Basic Materials', 'AMEX'),
+            ('FSR', 'Fisker Inc', 'Consumer Cyclical', 'NYSE'),
+            ('GOEV', 'Canoo Inc', 'Consumer Cyclical', 'NYSE'),
+            ('LCID', 'Lucid Group', 'Consumer Cyclical', 'NYSE'),
+            ('RIVN', 'Rivian Automotive', 'Consumer Cyclical', 'NYSE'),
+            ('PSNY', 'Polestar Automotive', 'Consumer Cyclical', 'NYSE'),
+            ('NKLA', 'Nikola Corp', 'Industrials', 'NYSE'),
+            ('RIDE', 'Lordstown Motors', 'Consumer Cyclical', 'NYSE'),
+            ('ARVL', 'Arrival SA', 'Consumer Cyclical', 'NYSE'),
+            ('WKHS', 'Workhorse Group', 'Industrials', 'NYSE'),
+            ('HYLN', 'Hyliion Holdings', 'Industrials', 'NYSE'),
+            ('XL', 'XL Fleet Corp', 'Industrials', 'NYSE'),
+            ('ASTS', 'AST SpaceMobile', 'Technology', 'NYSE'),
+            ('SPCE', 'Virgin Galactic', 'Industrials', 'NYSE'),
+            ('RKLB', 'Rocket Lab USA', 'Industrials', 'NYSE'),
+            ('RDW', 'Redwire Corp', 'Industrials', 'NYSE'),
+            ('MNTS', 'Momentus Inc', 'Industrials', 'NYSE'),
+            ('ASTR', 'Astra Space', 'Industrials', 'NYSE'),
+            ('PL', 'Planet Labs', 'Technology', 'NYSE'),
+            ('BKSY', 'BlackSky Technology', 'Technology', 'NYSE'),
+            ('SATL', 'Satellogic Inc', 'Technology', 'NYSE'),
         ]
 
         stocks = []
@@ -461,16 +540,79 @@ class BatchScreener:
         print(f"Loaded {len(stocks)} stocks from built-in list (Large: {len(LARGE_CAP_STOCKS)}, Mid: {len(MID_CAP_STOCKS)}, Small: {len(SMALL_CAP_STOCKS)}, Micro: {len(MICRO_CAP_STOCKS)})")
         return stocks
 
+    def _fetch_nasdaq_tickers(self) -> List[Dict]:
+        """
+        Fetch comprehensive ticker list from NASDAQ (free, no API key needed).
+        Returns ~11,000 stocks across NYSE, NASDAQ, AMEX.
+        """
+        url = 'https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqtraded.txt'
+
+        try:
+            print("Fetching ticker list from NASDAQ...")
+            resp = requests.get(url, timeout=30)
+            resp.raise_for_status()
+            lines = resp.text.strip().split('\n')
+
+            # Map market codes to exchange names
+            market_map = {'N': 'NYSE', 'Q': 'NASDAQ', 'A': 'AMEX', 'P': 'NYSE'}
+
+            stocks = []
+            for line in lines[1:-1]:  # Skip header and footer
+                parts = line.split('|')
+                if len(parts) >= 6:
+                    symbol = parts[1].strip()
+                    name = parts[2].strip()
+                    market = parts[3].strip()
+                    is_etf = parts[5].strip() == 'Y'
+                    test_issue = parts[7].strip() == 'Y' if len(parts) > 7 else False
+
+                    # Skip ETFs, test issues, empty symbols, and symbols with special chars
+                    if (symbol and
+                        market in market_map and
+                        not is_etf and
+                        not test_issue and
+                        symbol.isalpha() and  # Only letters (skip warrants, units, etc.)
+                        len(symbol) <= 5):  # Standard stock symbols
+
+                        stocks.append({
+                            'ticker': symbol,
+                            'name': name,
+                            'sector': 'N/A',  # Will be enriched if needed
+                            'exchange': market_map[market],
+                            'market_cap': 0,  # Will be enriched if needed
+                            'market_cap_universe': 'Unknown',
+                        })
+
+            # Count by exchange
+            exchanges = {}
+            for s in stocks:
+                e = s['exchange']
+                exchanges[e] = exchanges.get(e, 0) + 1
+            print(f"Loaded {len(stocks)} stocks from NASDAQ: {exchanges}")
+
+            return stocks
+
+        except Exception as e:
+            print(f"Error fetching from NASDAQ: {e}")
+            print("Falling back to built-in list...")
+            return None
+
     def _get_roic_universe(self, exchange: str = None) -> List[Dict]:
         """
-        Get stock universe for ROIC.ai mode.
-        Uses comprehensive stock list since ROIC.ai doesn't have a bulk tickers endpoint.
-        Market cap classification is done dynamically via enrichment.
+        Get stock universe dynamically from NASDAQ's free ticker list.
+        Falls back to built-in list if fetch fails.
         """
-        print("Loading comprehensive stock universe for ROIC.ai analysis...")
+        # Try to fetch dynamic list first
+        stocks = self._fetch_nasdaq_tickers()
 
-        # Use the same comprehensive list - market cap will be enriched dynamically
-        # when market cap filters are applied
+        if stocks:
+            # Filter by exchange if specified
+            if exchange:
+                stocks = [s for s in stocks if s['exchange'] == exchange]
+            return stocks
+
+        # Fallback to static list
+        print("Using fallback built-in stock list...")
         return self._get_yahoo_universe(exchange)
 
     def enrich_stock_info(self, stock: Dict) -> Dict:
@@ -492,16 +634,17 @@ class BatchScreener:
 
             stock['industry'] = info.get('industry', stock.get('industry', 'N/A'))
 
-            # Normalize exchange
-            raw_exchange = info.get('exchange', stock.get('exchange', 'N/A'))
-            if 'NASDAQ' in raw_exchange.upper() or 'NMS' in raw_exchange.upper() or 'NGM' in raw_exchange.upper():
-                stock['exchange'] = 'NASDAQ'
-            elif 'NYSE' in raw_exchange.upper() or 'NYQ' in raw_exchange.upper():
-                stock['exchange'] = 'NYSE'
-            elif 'AMEX' in raw_exchange.upper():
-                stock['exchange'] = 'AMEX'
-            else:
-                stock['exchange'] = raw_exchange
+            # Only update exchange if it was N/A (preserve our static data)
+            if stock.get('exchange') == 'N/A':
+                raw_exchange = info.get('exchange', 'N/A')
+                if 'NASDAQ' in raw_exchange.upper() or 'NMS' in raw_exchange.upper() or 'NGM' in raw_exchange.upper():
+                    stock['exchange'] = 'NASDAQ'
+                elif 'NYSE' in raw_exchange.upper() or 'NYQ' in raw_exchange.upper():
+                    stock['exchange'] = 'NYSE'
+                elif 'AMEX' in raw_exchange.upper():
+                    stock['exchange'] = 'AMEX'
+                else:
+                    stock['exchange'] = raw_exchange
 
             stock['market_cap'] = info.get('marketCap', 0) or 0
             stock['market_cap_universe'] = get_market_cap_universe(stock['market_cap'])
