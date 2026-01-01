@@ -33,78 +33,167 @@ st.set_page_config(
 # Custom CSS for Google Flights-inspired styling
 st.markdown("""
 <style>
-    /* Main header styling */
+    /* Import Google's Roboto font */
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+    /* Apply Roboto font globally */
+    html, body, [class*="css"] {
+        font-family: 'Roboto', sans-serif;
+    }
+
+    /* White background throughout */
+    .stApp {
+        background-color: #ffffff;
+    }
+
+    .main .block-container {
+        background-color: #ffffff;
+        padding-top: 1rem;
+    }
+
+    /* Main header styling - clean, no emoji */
     .main-header {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #1a73e8;
-        margin-bottom: 0.5rem;
-    }
-
-    /* Tab styling - Google Flights inspired */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0px;
-        background-color: #f8f9fa;
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        height: 40px;
-        padding: 0 24px;
-        background-color: transparent;
-        border-radius: 20px;
-        color: #5f6368;
+        font-family: 'Roboto', sans-serif;
+        font-size: 1.5rem;
         font-weight: 500;
-        border: none;
-    }
-
-    .stTabs [aria-selected="true"] {
-        background-color: #e8f0fe;
-        color: #1a73e8;
-    }
-
-    /* Filter bar styling */
-    .filter-bar {
-        background-color: #f8f9fa;
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
+        color: #202124;
         margin-bottom: 1rem;
     }
 
-    /* Filter dropdown button styling */
+    /* Tab styling - Google Flights style */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: transparent;
+        padding: 0;
+        border-bottom: 1px solid #dadce0;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        height: 48px;
+        padding: 0 16px;
+        background-color: transparent;
+        border-radius: 0;
+        color: #5f6368;
+        font-family: 'Roboto', sans-serif;
+        font-weight: 500;
+        font-size: 14px;
+        border: none;
+        border-bottom: 3px solid transparent;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #202124;
+        background-color: #f8f9fa;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background-color: transparent;
+        color: #1a73e8;
+        border-bottom: 3px solid #1a73e8;
+    }
+
+    /* Google Flights style filter buttons */
+    .stMultiSelect > div > div {
+        background-color: #ffffff;
+        border: 1px solid #dadce0;
+        border-radius: 20px;
+        min-height: 36px;
+    }
+
+    .stMultiSelect > div > div:hover {
+        background-color: #f8f9fa;
+    }
+
+    .stMultiSelect label {
+        font-family: 'Roboto', sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        color: #3c4043;
+    }
+
     .stSelectbox > div > div {
+        background-color: #ffffff;
+        border: 1px solid #dadce0;
+        border-radius: 20px;
+        min-height: 36px;
+    }
+
+    .stSelectbox > div > div:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* Number input styling */
+    .stNumberInput > div > div > input {
+        border: 1px solid #dadce0;
         border-radius: 20px;
     }
 
-    /* Metric cards */
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #1a73e8;
+    /* Button styling - Google style */
+    .stButton > button {
+        font-family: 'Roboto', sans-serif;
+        font-weight: 500;
+        border-radius: 20px;
+        border: 1px solid #dadce0;
+        background-color: #ffffff;
+        color: #3c4043;
+    }
+
+    .stButton > button:hover {
+        background-color: #f8f9fa;
+        border-color: #dadce0;
+    }
+
+    .stButton > button[kind="primary"] {
+        background-color: #1a73e8;
+        border-color: #1a73e8;
+        color: #ffffff;
+    }
+
+    .stButton > button[kind="primary"]:hover {
+        background-color: #1557b0;
+        border-color: #1557b0;
+    }
+
+    /* Metric styling */
+    [data-testid="stMetricValue"] {
+        font-family: 'Roboto', sans-serif;
+        font-weight: 500;
     }
 
     .undervalued {
         color: #137333;
-        font-weight: bold;
+        font-weight: 500;
     }
 
     .overvalued {
         color: #c5221f;
-        font-weight: bold;
+        font-weight: 500;
     }
 
-    /* Hide default streamlit hamburger menu for cleaner look */
+    /* Hide hamburger menu */
     #MainMenu {visibility: hidden;}
 
-    /* Compact filter popover */
-    .filter-section {
-        background: white;
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        font-family: 'Roboto', sans-serif;
+        font-weight: 500;
+        color: #3c4043;
+        background-color: #ffffff;
         border: 1px solid #dadce0;
         border-radius: 8px;
-        padding: 12px;
-        margin: 4px 0;
+    }
+
+    /* Info/warning boxes */
+    .stAlert {
+        border-radius: 8px;
+        border: none;
+    }
+
+    /* Clean divider */
+    hr {
+        border: none;
+        border-top: 1px solid #dadce0;
+        margin: 1rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -184,14 +273,14 @@ def add_to_history(result):
     st.session_state.analysis_history = st.session_state.analysis_history[:100]
 
 # ==================== HEADER ====================
-st.markdown('<p class="main-header">📊 DCF Stock Analyzer</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">DCF Stock Analyzer</p>', unsafe_allow_html=True)
 
 # ==================== MAIN TABS (Google Flights Style) ====================
 tab_analyze, tab_batch, tab_history, tab_settings = st.tabs([
-    "🔍 Analyze Stock",
-    "📊 Batch Screener",
-    "📋 Analysis History",
-    "⚙️ Settings"
+    "Analyze Stock",
+    "Batch Screener",
+    "Analysis History",
+    "Settings"
 ])
 
 # ==================== TAB: SETTINGS ====================
@@ -218,9 +307,9 @@ with tab_settings:
             )
             st.session_state.api_key = api_key
             if api_key:
-                st.success("✓ API key provided")
+                st.success("API key provided")
             else:
-                st.warning("⚠ API key required for Roic.ai")
+                st.warning("API key required for Roic.ai")
         else:
             api_key = "not_needed"
 
@@ -235,7 +324,7 @@ with tab_settings:
         st.info(f"**{preset['name']}:** {preset['description']}")
 
     # Advanced parameters
-    with st.expander("🔧 Customize Parameters"):
+    with st.expander("Customize Parameters"):
         col1, col2, col3 = st.columns(3)
 
         with col1:
@@ -312,7 +401,7 @@ with tab_analyze:
         ).upper()
 
     with col2:
-        analyze_button = st.button("🔍 Analyze", type="primary", use_container_width=True)
+        analyze_button = st.button("Analyze", type="primary", use_container_width=True)
 
     # Analysis execution
     if analyze_button:
@@ -363,7 +452,7 @@ with tab_analyze:
                 st.metric("Premium", f"{abs(discount):.1f}%", delta="Overvalued", delta_color="inverse")
 
         # Details
-        with st.expander("📊 Valuation Details", expanded=True):
+        with st.expander("Valuation Details", expanded=True):
             col1, col2, col3 = st.columns(3)
 
             with col1:
@@ -383,70 +472,118 @@ with tab_analyze:
                 st.metric("Projected Growth", f"{proj_growth:.1f}%")
 
     else:
-        st.info("👆 Enter a stock ticker and click 'Analyze' to begin")
+        st.info("Enter a stock ticker and click 'Analyze' to begin")
 
 # ==================== TAB: BATCH SCREENER ====================
 with tab_batch:
+    # Get all filter options
+    all_exchanges = get_all_exchanges()
+    all_sectors = get_all_sectors()
+    all_caps = get_all_market_cap_universes()
+
+    # Initialize filter states in session
+    if 'sel_exchanges' not in st.session_state:
+        st.session_state.sel_exchanges = []
+    if 'sel_sectors' not in st.session_state:
+        st.session_state.sel_sectors = []
+    if 'sel_caps' not in st.session_state:
+        st.session_state.sel_caps = []
+
     # ===== HORIZONTAL FILTER BAR (Google Flights Style) =====
-    st.markdown("### Filter Stocks")
+    # Filter buttons row
+    filter_cols = st.columns([1, 1, 1, 1, 0.8])
 
-    # Filter bar - horizontal layout
-    filter_cols = st.columns([1, 1, 1, 1, 0.5])
-
+    # Exchange Filter
     with filter_cols[0]:
-        # Exchange filter with "All" option
-        all_exchanges = get_all_exchanges()
-        exchange_options = ["All Exchanges"] + all_exchanges
-        selected_exchanges = st.multiselect(
-            "Exchange",
-            options=all_exchanges,
-            default=[],
-            help="Leave empty for all exchanges",
-            placeholder="All Exchanges"
-        )
+        exchange_label = "Exchange" if not st.session_state.sel_exchanges else f"Exchange ({len(st.session_state.sel_exchanges)})"
+        with st.expander(f"{exchange_label} ▾", expanded=False):
+            # Select All toggle
+            all_exchanges_selected = len(st.session_state.sel_exchanges) == len(all_exchanges)
+            select_all_ex = st.checkbox(
+                "Select all exchanges",
+                value=all_exchanges_selected,
+                key="select_all_exchanges"
+            )
 
+            st.markdown("---")
+
+            # Individual checkboxes
+            selected_exchanges = []
+            for ex in all_exchanges:
+                checked = ex in st.session_state.sel_exchanges or select_all_ex
+                if st.checkbox(ex, value=checked, key=f"ex_{ex}"):
+                    selected_exchanges.append(ex)
+
+            st.session_state.sel_exchanges = selected_exchanges if not select_all_ex else []
+
+    # Sector Filter
     with filter_cols[1]:
-        # Sector filter
-        all_sectors = get_all_sectors()
-        selected_sectors = st.multiselect(
-            "Sector",
-            options=all_sectors,
-            default=[],
-            help="Leave empty for all sectors",
-            placeholder="All Sectors"
-        )
+        sector_label = "Sector" if not st.session_state.sel_sectors else f"Sector ({len(st.session_state.sel_sectors)})"
+        with st.expander(f"{sector_label} ▾", expanded=False):
+            # Select All toggle
+            all_sectors_selected = len(st.session_state.sel_sectors) == len(all_sectors)
+            select_all_sec = st.checkbox(
+                "Select all sectors",
+                value=all_sectors_selected,
+                key="select_all_sectors"
+            )
 
+            st.markdown("---")
+
+            # Individual checkboxes
+            selected_sectors = []
+            for sec in all_sectors:
+                checked = sec in st.session_state.sel_sectors or select_all_sec
+                if st.checkbox(sec, value=checked, key=f"sec_{sec}"):
+                    selected_sectors.append(sec)
+
+            st.session_state.sel_sectors = selected_sectors if not select_all_sec else []
+
+    # Market Cap Filter
     with filter_cols[2]:
-        # Market Cap filter
-        all_caps = get_all_market_cap_universes()
-        selected_caps = st.multiselect(
-            "Market Cap",
-            options=all_caps,
-            default=[],
-            help="Leave empty for all market caps",
-            placeholder="All Market Caps"
-        )
+        cap_label = "Market Cap" if not st.session_state.sel_caps else f"Market Cap ({len(st.session_state.sel_caps)})"
+        with st.expander(f"{cap_label} ▾", expanded=False):
+            # Select All toggle
+            all_caps_selected = len(st.session_state.sel_caps) == len(all_caps)
+            select_all_cap = st.checkbox(
+                "Select all market caps",
+                value=all_caps_selected,
+                key="select_all_caps"
+            )
 
+            st.markdown("---")
+
+            # Individual checkboxes
+            selected_caps = []
+            for cap in all_caps:
+                checked = cap in st.session_state.sel_caps or select_all_cap
+                if st.checkbox(cap, value=checked, key=f"cap_{cap}"):
+                    selected_caps.append(cap)
+
+            st.session_state.sel_caps = selected_caps if not select_all_cap else []
+
+    # Max Stocks
     with filter_cols[3]:
-        # Max stocks
         max_stocks = st.number_input(
             "Max Stocks",
             min_value=5,
             max_value=100,
             value=20,
             step=5,
-            help="Maximum stocks to analyze"
+            label_visibility="visible"
         )
 
+    # Reset button
     with filter_cols[4]:
-        st.markdown("<br>", unsafe_allow_html=True)
-        reset_filters = st.button("🔄 Reset", use_container_width=True)
+        st.markdown("<div style='height: 28px'></div>", unsafe_allow_html=True)
+        if st.button("Reset", use_container_width=True):
+            st.session_state.sel_exchanges = []
+            st.session_state.sel_sectors = []
+            st.session_state.sel_caps = []
+            st.rerun()
 
-    if reset_filters:
-        st.rerun()
-
-    # Additional filters (collapsible)
-    with st.expander("📊 Advanced Filters"):
+    # Advanced filters
+    with st.expander("Advanced Filters ▾"):
         adv_cols = st.columns(4)
 
         with adv_cols[0]:
@@ -471,11 +608,11 @@ with tab_batch:
                 "Min Gross Margin %", min_value=0.0, max_value=100.0, value=0.0, step=5.0
             )
 
-    # Build filters dict
+    # Build filters dict (empty list = all)
     batch_filters = {
-        'sector': selected_sectors,
-        'exchange': selected_exchanges,
-        'market_cap_universe': selected_caps,
+        'sector': st.session_state.sel_sectors,
+        'exchange': st.session_state.sel_exchanges,
+        'market_cap_universe': st.session_state.sel_caps,
         'positive_fcf_last_year': fcf_last_year,
         'positive_fcf_years_3': fcf_years_3,
         'positive_fcf_years_5': fcf_years_5,
@@ -484,17 +621,17 @@ with tab_batch:
 
     # Show active filters summary
     active_filters = []
-    if selected_exchanges:
-        active_filters.append(f"Exchanges: {', '.join(selected_exchanges)}")
-    if selected_sectors:
-        active_filters.append(f"Sectors: {', '.join(selected_sectors)}")
-    if selected_caps:
-        active_filters.append(f"Market Cap: {', '.join(selected_caps)}")
+    if st.session_state.sel_exchanges:
+        active_filters.append(f"Exchanges: {', '.join(st.session_state.sel_exchanges)}")
+    if st.session_state.sel_sectors:
+        active_filters.append(f"Sectors: {', '.join(st.session_state.sel_sectors)}")
+    if st.session_state.sel_caps:
+        active_filters.append(f"Market Cap: {', '.join(st.session_state.sel_caps)}")
 
     if active_filters:
-        st.info("**Active Filters:** " + " | ".join(active_filters))
+        st.caption("Active: " + " | ".join(active_filters))
     else:
-        st.info("**No filters active** - Will screen all available stocks")
+        st.caption("No filters - screening all stocks")
 
     st.markdown("---")
 
@@ -502,10 +639,10 @@ with tab_batch:
     col1, col2, col3 = st.columns([1, 1, 3])
 
     with col1:
-        run_batch = st.button("🚀 Run Batch Analysis", type="primary", use_container_width=True)
+        run_batch = st.button("Run Batch Analysis", type="primary", use_container_width=True)
 
     with col2:
-        stop_batch = st.button("⏹ Stop", use_container_width=True)
+        stop_batch = st.button("Stop", use_container_width=True)
 
     # Batch execution
     if run_batch:
@@ -561,10 +698,9 @@ with tab_batch:
                         time.sleep(0.3)
 
                     progress_bar.progress(1.0)
-                    status_text.success(f"✅ Done! Analyzed {len(filtered_stocks)} stocks. Check 'Analysis History' tab.")
-                    st.balloons()
+                    status_text.success(f"Done! Analyzed {len(filtered_stocks)} stocks. Check 'Analysis History' tab.")
                 else:
-                    status_text.warning("⚠️ No stocks matched the filter criteria.")
+                    status_text.warning("No stocks matched the filter criteria.")
 
             except Exception as e:
                 st.error(f"Error: {str(e)}")
