@@ -57,77 +57,98 @@ def _supabase_save_analysis(result: Dict, params_hash: int = None):
     if not result or 'ticker' not in result:
         return
 
-    client = _get_supabase()
-    ticker = result['ticker']
-    run_date = result.get('run_date', datetime.now().isoformat())
+    try:
+        client = _get_supabase()
+        ticker = result['ticker']
+        run_date = result.get('run_date', datetime.now().isoformat())
 
-    data = {
-        'ticker': ticker,
-        'run_date': run_date,
-        'params_hash': params_hash,
-        'result_json': json.dumps(result),
-    }
+        data = {
+            'ticker': ticker,
+            'run_date': run_date,
+            'params_hash': params_hash,
+            'result_json': json.dumps(result),
+        }
 
-    # Upsert - update if exists, insert if not
-    client.table('analysis_history').upsert(data, on_conflict='ticker').execute()
+        # Upsert - update if exists, insert if not
+        client.table('analysis_history').upsert(data, on_conflict='ticker').execute()
+    except Exception as e:
+        print(f"Supabase save error: {e}")
 
 
 def _supabase_load_all_history(limit: int = 100) -> List[Dict]:
     """Load all history from Supabase"""
-    client = _get_supabase()
+    try:
+        client = _get_supabase()
 
-    response = client.table('analysis_history') \
-        .select('result_json') \
-        .order('run_date', desc=True) \
-        .limit(limit) \
-        .execute()
+        response = client.table('analysis_history') \
+            .select('result_json') \
+            .order('run_date', desc=True) \
+            .limit(limit) \
+            .execute()
 
-    history = []
-    for row in response.data:
-        try:
-            result = json.loads(row['result_json'])
-            history.append(result)
-        except (json.JSONDecodeError, KeyError):
-            pass
+        history = []
+        for row in response.data:
+            try:
+                result = json.loads(row['result_json'])
+                history.append(result)
+            except (json.JSONDecodeError, KeyError):
+                pass
 
-    return history
+        return history
+    except Exception as e:
+        print(f"Supabase load error: {e}")
+        return []
 
 
 def _supabase_get_analysis(ticker: str) -> Optional[Dict]:
     """Get analysis for specific ticker from Supabase"""
-    client = _get_supabase()
+    try:
+        client = _get_supabase()
 
-    response = client.table('analysis_history') \
-        .select('result_json') \
-        .eq('ticker', ticker) \
-        .execute()
+        response = client.table('analysis_history') \
+            .select('result_json') \
+            .eq('ticker', ticker) \
+            .execute()
 
-    if response.data and len(response.data) > 0:
-        try:
-            return json.loads(response.data[0]['result_json'])
-        except (json.JSONDecodeError, KeyError):
-            return None
-    return None
+        if response.data and len(response.data) > 0:
+            try:
+                return json.loads(response.data[0]['result_json'])
+            except (json.JSONDecodeError, KeyError):
+                return None
+        return None
+    except Exception as e:
+        print(f"Supabase get error: {e}")
+        return None
 
 
 def _supabase_delete_analysis(ticker: str):
     """Delete analysis from Supabase"""
-    client = _get_supabase()
-    client.table('analysis_history').delete().eq('ticker', ticker).execute()
+    try:
+        client = _get_supabase()
+        client.table('analysis_history').delete().eq('ticker', ticker).execute()
+    except Exception as e:
+        print(f"Supabase delete error: {e}")
 
 
 def _supabase_clear_all_history():
     """Clear all history from Supabase"""
-    client = _get_supabase()
-    # Delete all rows - Supabase requires a filter, so we use a truthy condition
-    client.table('analysis_history').delete().neq('ticker', '').execute()
+    try:
+        client = _get_supabase()
+        # Delete all rows - Supabase requires a filter, so we use a truthy condition
+        client.table('analysis_history').delete().neq('ticker', '').execute()
+    except Exception as e:
+        print(f"Supabase clear error: {e}")
 
 
 def _supabase_get_history_count() -> int:
     """Get count from Supabase"""
-    client = _get_supabase()
-    response = client.table('analysis_history').select('ticker', count='exact').execute()
-    return response.count if response.count else 0
+    try:
+        client = _get_supabase()
+        response = client.table('analysis_history').select('ticker', count='exact').execute()
+        return response.count if response.count else 0
+    except Exception as e:
+        print(f"Supabase count error: {e}")
+        return 0
 
 
 # ==================== SQLITE IMPLEMENTATION ====================
