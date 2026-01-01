@@ -876,6 +876,7 @@ with tab_batch:
 
             matched_tickers = []
             checked_count = [0]  # Use list to allow mutation in nested function
+            total_count = [0]  # Track total for display
 
             try:
                 source = "roic" if "Roic" in data_source else "yahoo"
@@ -883,22 +884,23 @@ with tab_batch:
                 analyzer = DCFAnalyzer(api_key=api_key, data_source=source)
 
                 def update_progress(current, total, message, is_filtering=True):
-                    pct = int((current / total) * 100) if total > 0 else 0
-                    progress_bar.progress(pct / 100)
+                    pct = current / total if total > 0 else 0
+                    progress_bar.progress(pct)
                     status_text.text(message)
-                    # Update checked count during filtering phase
+                    # Update counts during filtering phase
                     if is_filtering:
                         checked_count[0] = current
+                        total_count[0] = total
                         match_pct = (len(matched_tickers) / current * 100) if current > 0 else 0
                         stats_display.markdown(
-                            f"**Checked:** {current:,} | **Matched:** {len(matched_tickers)} | **Match Rate:** {match_pct:.1f}%"
+                            f"**Checked:** {current:,} / {total:,} | **Matched:** {len(matched_tickers)} | **Match Rate:** {match_pct:.1f}%"
                         )
 
                 def on_match(stock):
                     matched_tickers.append(stock['ticker'])
                     match_pct = (len(matched_tickers) / checked_count[0] * 100) if checked_count[0] > 0 else 0
                     stats_display.markdown(
-                        f"**Checked:** {checked_count[0]:,} | **Matched:** {len(matched_tickers)} | **Match Rate:** {match_pct:.1f}%"
+                        f"**Checked:** {checked_count[0]:,} / {total_count[0]:,} | **Matched:** {len(matched_tickers)} | **Match Rate:** {match_pct:.1f}%"
                     )
                     matched_display.success(f"**Matched Tickers:** {', '.join(matched_tickers)}")
 

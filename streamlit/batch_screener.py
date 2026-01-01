@@ -898,10 +898,9 @@ class BatchScreener:
                 # print(f"DEBUG: Reached max_stocks limit ({max_stocks})")
                 break
 
-            # Progress update
-            if progress_callback and i % 5 == 0:
-                pct = 5 + int((i / total_stocks) * 90)
-                progress_callback(pct, 100, f"Checking {stock['ticker']}... ({matched_count} matched)", True)
+            # Progress update - pass actual count, not percentage
+            if progress_callback:
+                progress_callback(i + 1, total_stocks, f"Checking {stock['ticker']}...", True)
 
             # Step 1: Basic filters (sector, exchange) - fast, no API call
             passes_basic = self.passes_basic_filters(stock, filters)
