@@ -69,9 +69,14 @@ def _supabase_save_analysis(result: Dict, params_hash: int = None):
             'result_json': json.dumps(result),
         }
 
-        # Upsert - update if exists, insert if not
-        response = client.table('analysis_history').upsert(data, on_conflict='ticker').execute()
-        print(f"Supabase save success: {ticker}")
+        # Try delete then insert (more reliable than upsert)
+        try:
+            client.table('analysis_history').delete().eq('ticker', ticker).execute()
+        except:
+            pass
+
+        response = client.table('analysis_history').insert(data).execute()
+        print(f"Supabase save success: {ticker}, response: {response}")
     except Exception as e:
         print(f"Supabase save error for {result.get('ticker', 'unknown')}: {e}")
         import traceback
