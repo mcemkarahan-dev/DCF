@@ -62,6 +62,7 @@ def _supabase_save_analysis(result: Dict, params_hash: int = None):
     """Save analysis to Supabase"""
     global _last_db_error
     if not result or 'ticker' not in result:
+        _last_db_error = "No ticker in result"
         return
 
     try:
@@ -76,18 +77,22 @@ def _supabase_save_analysis(result: Dict, params_hash: int = None):
             'result_json': json.dumps(result),
         }
 
-        # Try delete then insert (more reliable than upsert)
+        # Try delete first
         try:
             client.table('analysis_history').delete().eq('ticker', ticker).execute()
         except:
             pass
 
+        # Insert and check response
         response = client.table('analysis_history').insert(data).execute()
-        _last_db_error = None  # Clear error on success
+
+        # Check if insert actually worked
+        if response.data and len(response.data) > 0:
+            _last_db_error = None  # Success
+        else:
+            _last_db_error = f"Insert returned no data. Response: {response}"
     except Exception as e:
-        _last_db_error = f"Save error: {str(e)}"
-        import traceback
-        traceback.print_exc()
+        _last_db_error = f"Save exception: {str(e)}"
 
 
 def _supabase_load_all_history(limit: int = 100) -> List[Dict]:
