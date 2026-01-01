@@ -495,72 +495,113 @@ with tab_batch:
 
     # Exchange Filter
     with filter_cols[0]:
-        exchange_label = "Exchange" if not st.session_state.sel_exchanges else f"Exchange ({len(st.session_state.sel_exchanges)})"
+        # Show count only if not all selected
+        ex_count = len(st.session_state.sel_exchanges)
+        if ex_count == 0 or ex_count == len(all_exchanges):
+            exchange_label = "Exchange"
+        else:
+            exchange_label = f"Exchange ({ex_count})"
+
         with st.expander(f"{exchange_label} ▾", expanded=False):
-            # Select All toggle
-            all_exchanges_selected = len(st.session_state.sel_exchanges) == len(all_exchanges)
+            # Select All toggle - checked if all are selected
+            is_all_ex = set(st.session_state.sel_exchanges) == set(all_exchanges)
             select_all_ex = st.checkbox(
                 "Select all exchanges",
-                value=all_exchanges_selected,
+                value=is_all_ex,
                 key="select_all_exchanges"
             )
 
+            # Handle Select All click
+            if select_all_ex and not is_all_ex:
+                st.session_state.sel_exchanges = list(all_exchanges)
+                st.rerun()
+            elif not select_all_ex and is_all_ex:
+                st.session_state.sel_exchanges = []
+                st.rerun()
+
             st.markdown("---")
 
             # Individual checkboxes
-            selected_exchanges = []
+            new_exchanges = []
             for ex in all_exchanges:
-                checked = ex in st.session_state.sel_exchanges or select_all_ex
-                if st.checkbox(ex, value=checked, key=f"ex_{ex}"):
-                    selected_exchanges.append(ex)
+                is_checked = ex in st.session_state.sel_exchanges
+                if st.checkbox(ex, value=is_checked, key=f"ex_{ex}"):
+                    new_exchanges.append(ex)
 
-            st.session_state.sel_exchanges = selected_exchanges if not select_all_ex else []
+            # Update state if changed
+            if set(new_exchanges) != set(st.session_state.sel_exchanges):
+                st.session_state.sel_exchanges = new_exchanges
+                st.rerun()
 
     # Sector Filter
     with filter_cols[1]:
-        sector_label = "Sector" if not st.session_state.sel_sectors else f"Sector ({len(st.session_state.sel_sectors)})"
+        sec_count = len(st.session_state.sel_sectors)
+        if sec_count == 0 or sec_count == len(all_sectors):
+            sector_label = "Sector"
+        else:
+            sector_label = f"Sector ({sec_count})"
+
         with st.expander(f"{sector_label} ▾", expanded=False):
-            # Select All toggle
-            all_sectors_selected = len(st.session_state.sel_sectors) == len(all_sectors)
+            is_all_sec = set(st.session_state.sel_sectors) == set(all_sectors)
             select_all_sec = st.checkbox(
                 "Select all sectors",
-                value=all_sectors_selected,
+                value=is_all_sec,
                 key="select_all_sectors"
             )
 
+            if select_all_sec and not is_all_sec:
+                st.session_state.sel_sectors = list(all_sectors)
+                st.rerun()
+            elif not select_all_sec and is_all_sec:
+                st.session_state.sel_sectors = []
+                st.rerun()
+
             st.markdown("---")
 
-            # Individual checkboxes
-            selected_sectors = []
+            new_sectors = []
             for sec in all_sectors:
-                checked = sec in st.session_state.sel_sectors or select_all_sec
-                if st.checkbox(sec, value=checked, key=f"sec_{sec}"):
-                    selected_sectors.append(sec)
+                is_checked = sec in st.session_state.sel_sectors
+                if st.checkbox(sec, value=is_checked, key=f"sec_{sec}"):
+                    new_sectors.append(sec)
 
-            st.session_state.sel_sectors = selected_sectors if not select_all_sec else []
+            if set(new_sectors) != set(st.session_state.sel_sectors):
+                st.session_state.sel_sectors = new_sectors
+                st.rerun()
 
     # Market Cap Filter
     with filter_cols[2]:
-        cap_label = "Market Cap" if not st.session_state.sel_caps else f"Market Cap ({len(st.session_state.sel_caps)})"
+        cap_count = len(st.session_state.sel_caps)
+        if cap_count == 0 or cap_count == len(all_caps):
+            cap_label = "Market Cap"
+        else:
+            cap_label = f"Market Cap ({cap_count})"
+
         with st.expander(f"{cap_label} ▾", expanded=False):
-            # Select All toggle
-            all_caps_selected = len(st.session_state.sel_caps) == len(all_caps)
+            is_all_cap = set(st.session_state.sel_caps) == set(all_caps)
             select_all_cap = st.checkbox(
                 "Select all market caps",
-                value=all_caps_selected,
+                value=is_all_cap,
                 key="select_all_caps"
             )
 
+            if select_all_cap and not is_all_cap:
+                st.session_state.sel_caps = list(all_caps)
+                st.rerun()
+            elif not select_all_cap and is_all_cap:
+                st.session_state.sel_caps = []
+                st.rerun()
+
             st.markdown("---")
 
-            # Individual checkboxes
-            selected_caps = []
+            new_caps = []
             for cap in all_caps:
-                checked = cap in st.session_state.sel_caps or select_all_cap
-                if st.checkbox(cap, value=checked, key=f"cap_{cap}"):
-                    selected_caps.append(cap)
+                is_checked = cap in st.session_state.sel_caps
+                if st.checkbox(cap, value=is_checked, key=f"cap_{cap}"):
+                    new_caps.append(cap)
 
-            st.session_state.sel_caps = selected_caps if not select_all_cap else []
+            if set(new_caps) != set(st.session_state.sel_caps):
+                st.session_state.sel_caps = new_caps
+                st.rerun()
 
     # Max Stocks
     with filter_cols[3]:
