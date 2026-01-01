@@ -30,7 +30,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"  # Collapse sidebar by default for cleaner look
 )
 
-# Custom CSS for Google Flights-inspired styling
+# Custom CSS for Google Flights-inspired styling (Desktop + Mobile)
 st.markdown("""
 <style>
     /* Import Google's Roboto font */
@@ -66,6 +66,8 @@ st.markdown("""
         background-color: transparent;
         padding: 0;
         border-bottom: 1px solid #dadce0;
+        overflow-x: auto;
+        flex-wrap: nowrap;
     }
 
     .stTabs [data-baseweb="tab"] {
@@ -79,6 +81,7 @@ st.markdown("""
         font-size: 14px;
         border: none;
         border-bottom: 3px solid transparent;
+        white-space: nowrap;
     }
 
     .stTabs [data-baseweb="tab"]:hover {
@@ -136,6 +139,7 @@ st.markdown("""
         border: 1px solid #dadce0;
         background-color: #ffffff;
         color: #3c4043;
+        min-height: 44px;
     }
 
     .stButton > button:hover {
@@ -194,6 +198,109 @@ st.markdown("""
         border: none;
         border-top: 1px solid #dadce0;
         margin: 1rem 0;
+    }
+
+    /* ==================== MOBILE RESPONSIVE STYLES ==================== */
+    @media (max-width: 768px) {
+        /* Reduce padding on mobile */
+        .main .block-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+            padding-top: 0.5rem;
+        }
+
+        /* Smaller header on mobile */
+        .main-header {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Scrollable tabs on mobile */
+        .stTabs [data-baseweb="tab-list"] {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {
+            display: none;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            height: 44px;
+            padding: 0 12px;
+            font-size: 13px;
+            min-width: fit-content;
+        }
+
+        /* Larger touch targets for checkboxes */
+        .stCheckbox label {
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            font-size: 16px;
+        }
+
+        .stCheckbox > div {
+            min-height: 44px;
+        }
+
+        /* Larger buttons on mobile */
+        .stButton > button {
+            min-height: 48px;
+            font-size: 16px;
+            width: 100%;
+        }
+
+        /* Full-width inputs on mobile */
+        .stTextInput > div > div > input,
+        .stNumberInput > div > div > input {
+            min-height: 48px;
+            font-size: 16px;
+        }
+
+        /* Stack columns on mobile - Streamlit handles this but we ensure it */
+        [data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+
+        /* Expanders full width and larger touch target */
+        .streamlit-expanderHeader {
+            min-height: 48px;
+            font-size: 16px;
+        }
+
+        /* Metrics stack better */
+        [data-testid="stMetricValue"] {
+            font-size: 1.5rem;
+        }
+
+        [data-testid="stMetricLabel"] {
+            font-size: 0.875rem;
+        }
+
+        /* Data tables scroll horizontally */
+        .stDataFrame {
+            overflow-x: auto;
+        }
+    }
+
+    /* Extra small screens (phones in portrait) */
+    @media (max-width: 480px) {
+        .main-header {
+            font-size: 1.1rem;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            padding: 0 8px;
+            font-size: 12px;
+        }
+
+        [data-testid="stMetricValue"] {
+            font-size: 1.25rem;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
