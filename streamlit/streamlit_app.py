@@ -315,6 +315,9 @@ if 'analysis_result' not in st.session_state:
 if 'analysis_history' not in st.session_state:
     # Load from persistent database on first run
     st.session_state.analysis_history = db_storage.load_all_history(limit=100)
+    # Debug: show storage info
+    print(f"Storage backend: {db_storage.get_storage_backend()}")
+    print(f"Loaded {len(st.session_state.analysis_history)} items from history")
 if 'batch_running' not in st.session_state:
     st.session_state.batch_running = False
 
@@ -992,8 +995,12 @@ with tab_batch:
 
 # ==================== TAB: ANALYSIS HISTORY ====================
 with tab_history:
-    # Clear history button
-    col_clear, col_spacer = st.columns([1, 5])
+    # Storage status and clear button
+    col_status, col_clear, col_spacer = st.columns([2, 1, 3])
+    with col_status:
+        backend = db_storage.get_storage_backend()
+        history_count = len(st.session_state.analysis_history)
+        st.caption(f"Storage: {backend} | Items: {history_count}")
     with col_clear:
         if st.button("Clear History", type="secondary"):
             db_storage.clear_all_history()
