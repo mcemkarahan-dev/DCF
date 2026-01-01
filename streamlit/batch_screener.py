@@ -5,7 +5,7 @@ Designed for extensibility - easy to add new filter types
 """
 
 import yfinance as yf
-from typing import List, Dict, Optional, Callable, Any
+from typing import List, Dict, Optional, Callable, Any, Generator
 from dataclasses import dataclass, field
 from enum import Enum
 import time
@@ -33,6 +33,36 @@ class FilterDefinition:
     default: Any = None
     help_text: str = ""
     requires_financial_data: bool = False  # If True, needs data fetch to apply
+
+
+# ==================== SECTOR MAPPING ====================
+# Map GICS sectors (from S&P 500/Yahoo) to our filter display names
+GICS_SECTOR_MAP = {
+    'Information Technology': 'Technology',
+    'Technology': 'Technology',
+    'Health Care': 'Healthcare',
+    'Healthcare': 'Healthcare',
+    'Financials': 'Financial Services',
+    'Financial Services': 'Financial Services',
+    'Consumer Discretionary': 'Consumer Cyclical',
+    'Consumer Cyclical': 'Consumer Cyclical',
+    'Consumer Staples': 'Consumer Defensive',
+    'Consumer Defensive': 'Consumer Defensive',
+    'Industrials': 'Industrials',
+    'Energy': 'Energy',
+    'Utilities': 'Utilities',
+    'Real Estate': 'Real Estate',
+    'Materials': 'Basic Materials',
+    'Basic Materials': 'Basic Materials',
+    'Communication Services': 'Communication Services',
+    'Telecommunications': 'Communication Services',
+}
+
+def normalize_sector(sector: str) -> str:
+    """Normalize sector name to our standard names"""
+    if not sector or sector == 'N/A':
+        return 'N/A'
+    return GICS_SECTOR_MAP.get(sector, sector)
 
 
 # ==================== FILTER DEFINITIONS ====================
@@ -157,6 +187,8 @@ def get_filters_by_category() -> Dict[FilterCategory, List[FilterDefinition]]:
 
 def get_market_cap_universe(market_cap: float) -> str:
     """Classify market cap into universe tier"""
+    if not market_cap or market_cap == 0:
+        return "Unknown"
     if market_cap >= 200e9:
         return "Mega Cap"
     elif market_cap >= 10e9:
@@ -173,9 +205,8 @@ def get_market_cap_universe(market_cap: float) -> str:
 
 class BatchScreener:
     """
-    Batch stock screener with two-stage filtering:
-    1. Basic filters (sector, exchange, market cap) - fast, no data fetch
-    2. Financial filters (FCF, margins, growth) - requires data fetch
+    Batch stock screener with streaming results.
+    Yields matched stocks as they're found for live display.
     """
 
     def __init__(self, data_source: str = "yahoo", api_key: str = None):
@@ -202,18 +233,11 @@ class BatchScreener:
 
     def _get_yahoo_universe(self, exchange: str = None) -> List[Dict]:
         """
-        Get stock universe using Yahoo Finance screener.
-        Uses yfinance screener for major indices.
+        Get stock universe using S&P 500 from Wikipedia.
+        Already includes sector information from GICS.
         """
         stocks = []
 
-        # Get stocks from major indices
-        indices = {
-            'NASDAQ': '^IXIC',
-            'NYSE': '^NYA',
-        }
-
-        # Use S&P 500 as a reliable universe
         try:
             # Get S&P 500 tickers
             sp500_url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
@@ -222,36 +246,56 @@ class BatchScreener:
             sp500_df = tables[0]
 
             for _, row in sp500_df.iterrows():
-                ticker = row['Symbol'].replace('.', '-')  # Yahoo format
+                ticker = str(row['Symbol']).replace('.', '-')  # Yahoo format
+                raw_sector = row.get('GICS Sector', 'N/A')
+                normalized_sector = normalize_sector(raw_sector)
+
                 stock_info = {
                     'ticker': ticker,
                     'name': row.get('Security', ticker),
-                    'sector': row.get('GICS Sector', 'N/A'),
+                    'sector': normalized_sector,
+                    'raw_sector': raw_sector,
                     'industry': row.get('GICS Sub-Industry', 'N/A'),
-                    'exchange': 'NYSE' if row.get('Symbol', '').find('.') == -1 else 'NASDAQ',
-                    'market_cap': 0  # Will be fetched later if needed
+                    'exchange': 'NYSE',  # Most S&P 500 are NYSE, we'll verify later if needed
+                    'market_cap': 0,  # Will be fetched during enrichment if needed
+                    'market_cap_universe': 'Large Cap',  # S&P 500 are typically large cap+
                 }
 
-                # Filter by exchange if specified
-                if exchange and stock_info['exchange'] != exchange:
-                    continue
-
                 stocks.append(stock_info)
+
+            print(f"Loaded {len(stocks)} stocks from S&P 500")
 
         except Exception as e:
             print(f"Error fetching S&P 500 list: {e}")
             # Fallback to a small list of well-known tickers
             fallback_tickers = [
-                'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'JPM',
-                'JNJ', 'V', 'PG', 'UNH', 'HD', 'MA', 'DIS', 'PYPL', 'VZ', 'NFLX'
+                ('AAPL', 'Apple Inc.', 'Technology'),
+                ('MSFT', 'Microsoft Corp.', 'Technology'),
+                ('GOOGL', 'Alphabet Inc.', 'Communication Services'),
+                ('AMZN', 'Amazon.com Inc.', 'Consumer Cyclical'),
+                ('META', 'Meta Platforms Inc.', 'Communication Services'),
+                ('NVDA', 'NVIDIA Corp.', 'Technology'),
+                ('TSLA', 'Tesla Inc.', 'Consumer Cyclical'),
+                ('JPM', 'JPMorgan Chase', 'Financial Services'),
+                ('JNJ', 'Johnson & Johnson', 'Healthcare'),
+                ('V', 'Visa Inc.', 'Financial Services'),
+                ('PG', 'Procter & Gamble', 'Consumer Defensive'),
+                ('UNH', 'UnitedHealth Group', 'Healthcare'),
+                ('HD', 'Home Depot', 'Consumer Cyclical'),
+                ('MA', 'Mastercard', 'Financial Services'),
+                ('DIS', 'Walt Disney', 'Communication Services'),
+                ('PYPL', 'PayPal Holdings', 'Financial Services'),
+                ('VZ', 'Verizon', 'Communication Services'),
+                ('NFLX', 'Netflix Inc.', 'Communication Services'),
             ]
-            for ticker in fallback_tickers:
+            for ticker, name, sector in fallback_tickers:
                 stocks.append({
                     'ticker': ticker,
-                    'name': ticker,
-                    'sector': 'N/A',
-                    'exchange': 'N/A',
-                    'market_cap': 0
+                    'name': name,
+                    'sector': sector,
+                    'exchange': 'NASDAQ',
+                    'market_cap': 0,
+                    'market_cap_universe': 'Large Cap',
                 })
 
         return stocks
@@ -268,7 +312,8 @@ class BatchScreener:
                     'name': ticker,
                     'sector': 'N/A',  # Will be fetched later
                     'exchange': exchange or 'N/A',
-                    'market_cap': 0
+                    'market_cap': 0,
+                    'market_cap_universe': 'Unknown',
                 })
 
             return stocks
@@ -278,8 +323,8 @@ class BatchScreener:
 
     def enrich_stock_info(self, stock: Dict) -> Dict:
         """
-        Fetch additional info for a stock (sector, market cap, etc.)
-        Used for stocks where we don't have complete info
+        Fetch additional info for a stock (market cap, etc.)
+        Only called when needed for filtering.
         """
         try:
             ticker = stock['ticker']
@@ -287,9 +332,25 @@ class BatchScreener:
             info = yf_ticker.info
 
             stock['name'] = info.get('longName', stock.get('name', ticker))
-            stock['sector'] = info.get('sector', stock.get('sector', 'N/A'))
+
+            # Only update sector if it was N/A
+            if stock.get('sector') == 'N/A':
+                raw_sector = info.get('sector', 'N/A')
+                stock['sector'] = normalize_sector(raw_sector)
+
             stock['industry'] = info.get('industry', stock.get('industry', 'N/A'))
-            stock['exchange'] = info.get('exchange', stock.get('exchange', 'N/A'))
+
+            # Normalize exchange
+            raw_exchange = info.get('exchange', stock.get('exchange', 'N/A'))
+            if 'NASDAQ' in raw_exchange.upper() or 'NMS' in raw_exchange.upper() or 'NGM' in raw_exchange.upper():
+                stock['exchange'] = 'NASDAQ'
+            elif 'NYSE' in raw_exchange.upper() or 'NYQ' in raw_exchange.upper():
+                stock['exchange'] = 'NYSE'
+            elif 'AMEX' in raw_exchange.upper():
+                stock['exchange'] = 'AMEX'
+            else:
+                stock['exchange'] = raw_exchange
+
             stock['market_cap'] = info.get('marketCap', 0) or 0
             stock['market_cap_universe'] = get_market_cap_universe(stock['market_cap'])
 
@@ -298,8 +359,10 @@ class BatchScreener:
 
         except Exception as e:
             print(f"Error enriching {stock['ticker']}: {e}")
-            stock['market_cap_universe'] = 'Unknown'
-            stock['gross_margin'] = 0
+            if 'market_cap_universe' not in stock:
+                stock['market_cap_universe'] = 'Unknown'
+            if 'gross_margin' not in stock:
+                stock['gross_margin'] = 0
 
         return stock
 
@@ -373,43 +436,47 @@ class BatchScreener:
                 'full_data': None
             }
 
-    def apply_basic_filters(self, stocks: List[Dict], filters: Dict) -> List[Dict]:
+    def passes_basic_filters(self, stock: Dict, filters: Dict) -> bool:
         """
-        Apply basic filters that don't require financial data fetch.
+        Check if stock passes basic filters.
+        Empty filter list = pass all (SELECT ALL behavior).
         """
-        filtered = []
+        # Sector filter - empty means all
+        sector_filter = filters.get('sector', [])
+        if sector_filter and len(sector_filter) > 0:
+            stock_sector = stock.get('sector', 'N/A')
+            if stock_sector not in sector_filter and stock_sector != 'N/A':
+                return False
+            # If sector is N/A but filter is active, we might still want to include it
+            # Let's be permissive and include N/A sectors
 
-        for stock in stocks:
-            # Sector filter
-            if filters.get('sector') and len(filters['sector']) > 0:
-                if stock.get('sector', 'N/A') not in filters['sector']:
-                    continue
+        # Exchange filter - empty means all
+        exchange_filter = filters.get('exchange', [])
+        if exchange_filter and len(exchange_filter) > 0:
+            stock_exchange = stock.get('exchange', 'N/A')
+            # Normalize exchange
+            if 'NASDAQ' in stock_exchange.upper() or 'NMS' in stock_exchange.upper():
+                stock_exchange = 'NASDAQ'
+            elif 'NYSE' in stock_exchange.upper() or 'NYQ' in stock_exchange.upper():
+                stock_exchange = 'NYSE'
+            elif 'AMEX' in stock_exchange.upper():
+                stock_exchange = 'AMEX'
 
-            # Exchange filter
-            if filters.get('exchange') and len(filters['exchange']) > 0:
-                stock_exchange = stock.get('exchange', 'N/A')
-                # Normalize exchange names
-                if 'NASDAQ' in stock_exchange.upper() or 'NMS' in stock_exchange.upper():
-                    stock_exchange = 'NASDAQ'
-                elif 'NYSE' in stock_exchange.upper() or 'NYQ' in stock_exchange.upper():
-                    stock_exchange = 'NYSE'
-                elif 'AMEX' in stock_exchange.upper():
-                    stock_exchange = 'AMEX'
+            if stock_exchange not in exchange_filter and stock_exchange != 'N/A':
+                return False
 
-                if stock_exchange not in filters['exchange']:
-                    continue
+        # Market cap universe filter - empty means all
+        market_cap_filter = filters.get('market_cap_universe', [])
+        if market_cap_filter and len(market_cap_filter) > 0:
+            universe = stock.get('market_cap_universe', 'Unknown')
+            # If unknown and filter is active, we should probably include it
+            # and let enrichment determine the actual value
+            if universe != 'Unknown' and universe not in market_cap_filter:
+                return False
 
-            # Market cap universe filter
-            if filters.get('market_cap_universe') and len(filters['market_cap_universe']) > 0:
-                universe = stock.get('market_cap_universe', 'Unknown')
-                if universe not in filters['market_cap_universe']:
-                    continue
+        return True
 
-            filtered.append(stock)
-
-        return filtered
-
-    def apply_financial_filters(self, stock: Dict, metrics: Dict, filters: Dict) -> bool:
+    def passes_financial_filters(self, stock: Dict, metrics: Dict, filters: Dict) -> bool:
         """
         Apply financial filters that require data fetch.
         Returns True if stock passes all filters.
@@ -424,31 +491,31 @@ class BatchScreener:
 
         # Positive FCF years (3)
         min_fcf_3 = filters.get('positive_fcf_years_3', 0)
-        if min_fcf_3 > 0:
+        if min_fcf_3 and min_fcf_3 > 0:
             if metrics.get('positive_fcf_years_3', 0) < min_fcf_3:
                 return False
 
         # Positive FCF years (5)
         min_fcf_5 = filters.get('positive_fcf_years_5', 0)
-        if min_fcf_5 > 0:
+        if min_fcf_5 and min_fcf_5 > 0:
             if metrics.get('positive_fcf_years_5', 0) < min_fcf_5:
                 return False
 
         # Positive FCF years (10)
         min_fcf_10 = filters.get('positive_fcf_years_10', 0)
-        if min_fcf_10 > 0:
+        if min_fcf_10 and min_fcf_10 > 0:
             if metrics.get('positive_fcf_years_10', 0) < min_fcf_10:
                 return False
 
         # Revenue growth years
         min_rev_growth = filters.get('revenue_growth_years_5', 0)
-        if min_rev_growth > 0:
+        if min_rev_growth and min_rev_growth > 0:
             if metrics.get('revenue_growth_years_5', 0) < min_rev_growth:
                 return False
 
         # Minimum gross margin
         min_gross_margin = filters.get('min_gross_margin', 0)
-        if min_gross_margin > 0:
+        if min_gross_margin and min_gross_margin > 0:
             if stock.get('gross_margin', 0) < min_gross_margin:
                 return False
 
@@ -456,97 +523,122 @@ class BatchScreener:
 
     def has_financial_filters(self, filters: Dict) -> bool:
         """Check if any financial filters are active"""
-        financial_filter_keys = [
-            'positive_fcf_last_year', 'positive_fcf_years_3', 'positive_fcf_years_5',
-            'positive_fcf_years_10', 'revenue_growth_years_5', 'min_gross_margin'
-        ]
-
-        for key in financial_filter_keys:
-            value = filters.get(key)
-            if value is not None and value != 0 and value != "Any" and value != []:
-                return True
-
+        if filters.get('positive_fcf_last_year') not in [None, "Any", ""]:
+            return True
+        if filters.get('positive_fcf_years_3', 0) > 0:
+            return True
+        if filters.get('positive_fcf_years_5', 0) > 0:
+            return True
+        if filters.get('positive_fcf_years_10', 0) > 0:
+            return True
+        if filters.get('revenue_growth_years_5', 0) > 0:
+            return True
+        if filters.get('min_gross_margin', 0) > 0:
+            return True
         return False
+
+    def needs_enrichment(self, filters: Dict) -> bool:
+        """Check if we need to enrich stocks with additional data"""
+        # Need enrichment if market cap filter is active
+        if filters.get('market_cap_universe') and len(filters['market_cap_universe']) > 0:
+            return True
+        # Need enrichment if gross margin filter is active
+        if filters.get('min_gross_margin', 0) > 0:
+            return True
+        return False
+
+    def screen_stocks_streaming(self, filters: Dict,
+                                progress_callback: Callable = None,
+                                match_callback: Callable = None,
+                                max_stocks: int = None) -> Generator[Dict, None, None]:
+        """
+        Screen stocks with streaming results.
+        Yields matched stocks as they're found.
+
+        Args:
+            filters: Dict of filter values
+            progress_callback: Function(current, total, message, is_filtering) for progress updates
+            match_callback: Function(stock) called when a stock matches
+            max_stocks: Maximum number of stocks to return
+
+        Yields:
+            Stock dicts that pass all filters
+        """
+        # Get initial universe
+        if progress_callback:
+            progress_callback(0, 100, "Fetching stock universe...", True)
+
+        stocks = self.get_stock_universe()
+
+        if not stocks:
+            if progress_callback:
+                progress_callback(100, 100, "No stocks found in universe", False)
+            return
+
+        total_stocks = len(stocks)
+        matched_count = 0
+        need_enrichment = self.needs_enrichment(filters)
+        need_financial = self.has_financial_filters(filters)
+
+        if progress_callback:
+            progress_callback(5, 100, f"Screening {total_stocks} stocks...", True)
+
+        for i, stock in enumerate(stocks):
+            if max_stocks and matched_count >= max_stocks:
+                break
+
+            # Progress update
+            if progress_callback and i % 5 == 0:
+                pct = 5 + int((i / total_stocks) * 90)
+                progress_callback(pct, 100, f"Checking {stock['ticker']}... ({matched_count} matched)", True)
+
+            # Step 1: Basic filters (sector, exchange) - fast, no API call
+            if not self.passes_basic_filters(stock, filters):
+                continue
+
+            # Step 2: Enrichment if needed (market cap universe, gross margin)
+            if need_enrichment:
+                stock = self.enrich_stock_info(stock)
+                time.sleep(0.1)  # Rate limiting
+
+                # Re-check market cap filter after enrichment
+                market_cap_filter = filters.get('market_cap_universe', [])
+                if market_cap_filter and len(market_cap_filter) > 0:
+                    if stock.get('market_cap_universe', 'Unknown') not in market_cap_filter:
+                        continue
+
+            # Step 3: Financial filters if needed
+            if need_financial:
+                metrics = self.get_financial_metrics(stock['ticker'])
+                time.sleep(0.2)  # Rate limiting
+
+                if not self.passes_financial_filters(stock, metrics, filters):
+                    continue
+
+                stock['metrics'] = metrics
+
+            # Stock passed all filters!
+            matched_count += 1
+
+            if match_callback:
+                match_callback(stock)
+
+            yield stock
+
+        if progress_callback:
+            progress_callback(100, 100, f"Screening complete: {matched_count} stocks matched", False)
 
     def screen_stocks(self, filters: Dict, progress_callback: Callable = None,
                      max_stocks: int = None) -> List[Dict]:
         """
-        Main screening method. Returns list of stocks that pass all filters.
-
-        Args:
-            filters: Dict of filter values
-            progress_callback: Function(current, total, message) for progress updates
-            max_stocks: Maximum number of stocks to return
-
-        Returns:
-            List of stock dicts that pass all filters, with enriched data
+        Screen stocks and return list (non-streaming version for compatibility).
         """
-        # Get initial universe
-        if progress_callback:
-            progress_callback(0, 100, "Fetching stock universe...")
-
-        exchange_filter = filters.get('exchange', [])
-        exchange = exchange_filter[0] if len(exchange_filter) == 1 else None
-
-        stocks = self.get_stock_universe(exchange)
-
-        if progress_callback:
-            progress_callback(10, 100, f"Found {len(stocks)} stocks, enriching data...")
-
-        # Enrich stocks with basic info (for basic filtering)
-        enriched_stocks = []
-        for i, stock in enumerate(stocks):
-            if progress_callback and i % 10 == 0:
-                pct = 10 + int((i / len(stocks)) * 30)
-                progress_callback(pct, 100, f"Enriching stock data... ({i}/{len(stocks)})")
-
-            enriched = self.enrich_stock_info(stock)
-            enriched_stocks.append(enriched)
-            time.sleep(0.1)  # Rate limiting
-
-        # Apply basic filters
-        if progress_callback:
-            progress_callback(40, 100, "Applying basic filters...")
-
-        basic_filtered = self.apply_basic_filters(enriched_stocks, filters)
-
-        if progress_callback:
-            progress_callback(45, 100, f"{len(basic_filtered)} stocks passed basic filters")
-
-        # If no financial filters, we're done
-        if not self.has_financial_filters(filters):
-            result = basic_filtered[:max_stocks] if max_stocks else basic_filtered
-            if progress_callback:
-                progress_callback(100, 100, f"Screening complete: {len(result)} stocks")
-            return result
-
-        # Apply financial filters (requires data fetch)
-        if progress_callback:
-            progress_callback(50, 100, "Applying financial filters...")
-
-        final_stocks = []
-        for i, stock in enumerate(basic_filtered):
-            if max_stocks and len(final_stocks) >= max_stocks:
-                break
-
-            if progress_callback:
-                pct = 50 + int((i / len(basic_filtered)) * 45)
-                progress_callback(pct, 100, f"Checking {stock['ticker']}... ({i}/{len(basic_filtered)})")
-
-            # Fetch financial metrics
-            metrics = self.get_financial_metrics(stock['ticker'])
-
-            # Apply financial filters
-            if self.apply_financial_filters(stock, metrics, filters):
-                stock['metrics'] = metrics
-                final_stocks.append(stock)
-
-            time.sleep(0.2)  # Rate limiting
-
-        if progress_callback:
-            progress_callback(100, 100, f"Screening complete: {len(final_stocks)} stocks passed all filters")
-
-        return final_stocks
+        results = list(self.screen_stocks_streaming(
+            filters=filters,
+            progress_callback=progress_callback,
+            max_stocks=max_stocks
+        ))
+        return results
 
 
 # Get all unique sectors from the filter definition

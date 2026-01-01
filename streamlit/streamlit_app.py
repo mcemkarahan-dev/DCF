@@ -458,7 +458,7 @@ with tab1:
             active_filters.append(f"Exchanges: {', '.join(batch_filters['exchange'])}")
         if batch_filters.get('market_cap_universe'):
             active_filters.append(f"Market Cap: {', '.join(batch_filters['market_cap_universe'])}")
-        if batch_filters.get('positive_fcf_last_year') != "Any":
+        if batch_filters.get('positive_fcf_last_year') not in [None, "Any", ""]:
             active_filters.append(f"Positive FCF Last Year: {batch_filters['positive_fcf_last_year']}")
         if batch_filters.get('positive_fcf_years_3', 0) > 0:
             active_filters.append(f"Min FCF Years (3yr): {batch_filters['positive_fcf_years_3']}")
@@ -472,7 +472,7 @@ with tab1:
         if active_filters:
             st.info("**Active Filters:** " + " | ".join(active_filters))
         else:
-            st.warning("No filters active. All stocks in the universe will be analyzed (up to max limit).")
+            st.info("**No filters active** - All S&P 500 stocks will be screened (up to max limit).")
 
         # Run batch button
         col1, col2, col3 = st.columns([1, 1, 2])
@@ -483,59 +483,75 @@ with tab1:
         with col2:
             stop_batch = st.button("⏹ Stop", use_container_width=True)
 
-        # Progress display
-        if st.session_state.batch_running:
-            st.progress(st.session_state.batch_progress / 100)
-            st.caption(st.session_state.batch_message)
-
         # Batch execution
         if run_batch:
             if "Roic" in data_source and not api_key:
                 st.error("Please enter your Roic.ai API key in the sidebar")
             else:
                 st.session_state.batch_running = True
+
+                # Create UI elements for live updates
                 progress_bar = st.progress(0)
-                status_text = st.empty()
+                status_container = st.container()
+                with status_container:
+                    status_text = st.empty()
+                    filtering_indicator = st.empty()
+
+                # Live matched tickers display
+                st.markdown("---")
+                matched_header = st.empty()
+                matched_tickers_display = st.empty()
+
+                matched_tickers_list = []
 
                 try:
                     source = "roic" if "Roic" in data_source else "yahoo"
                     screener = BatchScreener(data_source=source, api_key=api_key)
                     analyzer = DCFAnalyzer(api_key=api_key, data_source=source)
 
-                    # Progress callback
-                    def update_progress(current, total, message):
+                    # Progress callback with is_filtering flag
+                    def update_progress(current, total, message, is_filtering=True):
                         pct = int((current / total) * 100) if total > 0 else 0
                         progress_bar.progress(pct / 100)
                         status_text.text(message)
-                        st.session_state.batch_progress = pct
-                        st.session_state.batch_message = message
+                        if is_filtering:
+                            filtering_indicator.info("🔄 **Filtering in progress...**")
+                        else:
+                            filtering_indicator.success("✅ **Filtering complete**")
 
-                    # Screen stocks
-                    update_progress(0, 100, "Starting batch screening...")
-                    max_stocks_val = st.session_state.get('batch_filters', {}).get('max_stocks', 20)
+                    # Match callback - update live display
+                    def on_match(stock):
+                        matched_tickers_list.append(stock)
+                        matched_header.markdown(f"### Matched Tickers ({len(matched_tickers_list)})")
+                        ticker_text = ", ".join([s['ticker'] for s in matched_tickers_list])
+                        matched_tickers_display.code(ticker_text)
 
-                    # Use the sidebar value if available
+                    # Screen stocks with streaming
+                    update_progress(0, 100, "Starting batch screening...", True)
+                    matched_header.markdown("### Matched Tickers (0)")
+                    matched_tickers_display.code("Scanning...")
+
                     try:
                         max_stocks_val = max_stocks
                     except:
                         max_stocks_val = 20
 
-                    filtered_stocks = screener.screen_stocks(
+                    # Use streaming to show matches live
+                    filtered_stocks = []
+                    for stock in screener.screen_stocks_streaming(
                         filters=batch_filters,
                         progress_callback=update_progress,
+                        match_callback=on_match,
                         max_stocks=max_stocks_val
-                    )
+                    ):
+                        filtered_stocks.append(stock)
 
                     # Run DCF on filtered stocks
                     if filtered_stocks:
-                        status_text.text(f"Running DCF analysis on {len(filtered_stocks)} stocks...")
+                        filtering_indicator.success(f"✅ **Found {len(filtered_stocks)} stocks - Running DCF analysis...**")
+
                         analyzed_count = 0
-
                         for i, stock in enumerate(filtered_stocks):
-                            if stop_batch:
-                                status_text.text("Batch stopped by user.")
-                                break
-
                             ticker_batch = stock['ticker']
                             pct = int(((i + 1) / len(filtered_stocks)) * 100)
                             progress_bar.progress(pct / 100)
@@ -553,19 +569,23 @@ with tab1:
                                     analyzed_count += 1
 
                             except Exception as e:
-                                st.warning(f"Error analyzing {ticker_batch}: {str(e)}")
+                                print(f"Error analyzing {ticker_batch}: {str(e)}")
 
-                            time.sleep(0.5)  # Rate limiting
+                            time.sleep(0.3)  # Rate limiting
 
                         progress_bar.progress(1.0)
-                        status_text.text(f"Batch complete! Analyzed {analyzed_count} stocks. Check the 'Analysis History' tab for results.")
-                        st.success(f"Successfully analyzed {analyzed_count} stocks!")
+                        status_text.text(f"Batch complete!")
+                        filtering_indicator.success(f"✅ **Done! Analyzed {analyzed_count} stocks. Check 'Analysis History' tab.**")
+                        st.balloons()
                     else:
-                        status_text.text("No stocks matched the filter criteria.")
-                        st.warning("No stocks matched your filters. Try relaxing the criteria.")
+                        status_text.text("Screening complete")
+                        filtering_indicator.warning("⚠️ **No stocks matched the filter criteria.** Try relaxing the filters.")
+                        matched_tickers_display.code("No matches found")
 
                 except Exception as e:
                     st.error(f"Batch analysis error: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
 
                 finally:
                     st.session_state.batch_running = False
