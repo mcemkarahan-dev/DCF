@@ -597,12 +597,39 @@ with tab_batch:
         st.session_state.sel_caps = []
 
     # ===== HORIZONTAL FILTER BAR (Google Flights Style) =====
+
+    # Callbacks to handle Select All toggling
+    def on_select_all_exchanges():
+        if st.session_state.select_all_exchanges:
+            # Check all individual checkboxes
+            for ex in all_exchanges:
+                st.session_state[f"ex_{ex}"] = True
+        else:
+            # Uncheck all individual checkboxes
+            for ex in all_exchanges:
+                st.session_state[f"ex_{ex}"] = False
+
+    def on_select_all_sectors():
+        if st.session_state.select_all_sectors:
+            for sec in all_sectors:
+                st.session_state[f"sec_{sec}"] = True
+        else:
+            for sec in all_sectors:
+                st.session_state[f"sec_{sec}"] = False
+
+    def on_select_all_caps():
+        if st.session_state.select_all_caps:
+            for cap in all_caps:
+                st.session_state[f"cap_{cap}"] = True
+        else:
+            for cap in all_caps:
+                st.session_state[f"cap_{cap}"] = False
+
     # Filter buttons row
     filter_cols = st.columns([1, 1, 1, 1, 0.8])
 
     # Exchange Filter
     with filter_cols[0]:
-        # Show count only if not all selected
         ex_count = len(st.session_state.sel_exchanges)
         if ex_count == 0 or ex_count == len(all_exchanges):
             exchange_label = "Exchange"
@@ -610,35 +637,25 @@ with tab_batch:
             exchange_label = f"Exchange ({ex_count})"
 
         with st.expander(f"{exchange_label} ▾", expanded=False):
-            # Select All toggle - checked if all are selected
-            is_all_ex = set(st.session_state.sel_exchanges) == set(all_exchanges)
-            select_all_ex = st.checkbox(
+            # Select All checkbox with callback
+            st.checkbox(
                 "Select all exchanges",
-                value=is_all_ex,
-                key="select_all_exchanges"
+                value=len(st.session_state.sel_exchanges) == len(all_exchanges),
+                key="select_all_exchanges",
+                on_change=on_select_all_exchanges
             )
-
-            # Handle Select All click
-            if select_all_ex and not is_all_ex:
-                st.session_state.sel_exchanges = list(all_exchanges)
-                st.rerun()
-            elif not select_all_ex and is_all_ex:
-                st.session_state.sel_exchanges = []
-                st.rerun()
 
             st.markdown("---")
 
             # Individual checkboxes
             new_exchanges = []
             for ex in all_exchanges:
-                is_checked = ex in st.session_state.sel_exchanges
-                if st.checkbox(ex, value=is_checked, key=f"ex_{ex}"):
+                default_checked = ex in st.session_state.sel_exchanges
+                if st.checkbox(ex, value=default_checked, key=f"ex_{ex}"):
                     new_exchanges.append(ex)
 
-            # Update state if changed
-            if set(new_exchanges) != set(st.session_state.sel_exchanges):
-                st.session_state.sel_exchanges = new_exchanges
-                st.rerun()
+            # Update session state
+            st.session_state.sel_exchanges = new_exchanges
 
     # Sector Filter
     with filter_cols[1]:
@@ -649,31 +666,22 @@ with tab_batch:
             sector_label = f"Sector ({sec_count})"
 
         with st.expander(f"{sector_label} ▾", expanded=False):
-            is_all_sec = set(st.session_state.sel_sectors) == set(all_sectors)
-            select_all_sec = st.checkbox(
+            st.checkbox(
                 "Select all sectors",
-                value=is_all_sec,
-                key="select_all_sectors"
+                value=len(st.session_state.sel_sectors) == len(all_sectors),
+                key="select_all_sectors",
+                on_change=on_select_all_sectors
             )
-
-            if select_all_sec and not is_all_sec:
-                st.session_state.sel_sectors = list(all_sectors)
-                st.rerun()
-            elif not select_all_sec and is_all_sec:
-                st.session_state.sel_sectors = []
-                st.rerun()
 
             st.markdown("---")
 
             new_sectors = []
             for sec in all_sectors:
-                is_checked = sec in st.session_state.sel_sectors
-                if st.checkbox(sec, value=is_checked, key=f"sec_{sec}"):
+                default_checked = sec in st.session_state.sel_sectors
+                if st.checkbox(sec, value=default_checked, key=f"sec_{sec}"):
                     new_sectors.append(sec)
 
-            if set(new_sectors) != set(st.session_state.sel_sectors):
-                st.session_state.sel_sectors = new_sectors
-                st.rerun()
+            st.session_state.sel_sectors = new_sectors
 
     # Market Cap Filter
     with filter_cols[2]:
@@ -684,31 +692,22 @@ with tab_batch:
             cap_label = f"Market Cap ({cap_count})"
 
         with st.expander(f"{cap_label} ▾", expanded=False):
-            is_all_cap = set(st.session_state.sel_caps) == set(all_caps)
-            select_all_cap = st.checkbox(
+            st.checkbox(
                 "Select all market caps",
-                value=is_all_cap,
-                key="select_all_caps"
+                value=len(st.session_state.sel_caps) == len(all_caps),
+                key="select_all_caps",
+                on_change=on_select_all_caps
             )
-
-            if select_all_cap and not is_all_cap:
-                st.session_state.sel_caps = list(all_caps)
-                st.rerun()
-            elif not select_all_cap and is_all_cap:
-                st.session_state.sel_caps = []
-                st.rerun()
 
             st.markdown("---")
 
             new_caps = []
             for cap in all_caps:
-                is_checked = cap in st.session_state.sel_caps
-                if st.checkbox(cap, value=is_checked, key=f"cap_{cap}"):
+                default_checked = cap in st.session_state.sel_caps
+                if st.checkbox(cap, value=default_checked, key=f"cap_{cap}"):
                     new_caps.append(cap)
 
-            if set(new_caps) != set(st.session_state.sel_caps):
-                st.session_state.sel_caps = new_caps
-                st.rerun()
+            st.session_state.sel_caps = new_caps
 
     # Max Stocks
     with filter_cols[3]:
