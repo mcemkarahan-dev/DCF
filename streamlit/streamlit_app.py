@@ -1052,7 +1052,7 @@ with tab_history:
 
                 st.markdown(f"### {selected_ticker} - Financial History")
 
-                # Helper function to create compact charts
+                # Helper function to create compact charts with trendline
                 def create_mini_chart(data, value_col, title, color='#1a73e8', format_type='currency', show_projection=False, projections=None, last_year=None):
                     if not data:
                         return None
@@ -1060,11 +1060,13 @@ with tab_history:
                     years = []
                     values = []
                     types = []
+                    year_nums = []  # Numeric year for trendline calculation
 
                     for year, value in data:
                         years.append(str(year))
                         values.append(value)
                         types.append('Historical')
+                        year_nums.append(year)
 
                     # Add projections if provided
                     if show_projection and projections and last_year:
@@ -1072,23 +1074,53 @@ with tab_history:
                             years.append(str(last_year + i + 1))
                             values.append(proj_value)
                             types.append('Projected')
+                            year_nums.append(last_year + i + 1)
 
-                    chart_df = pd.DataFrame({'Year': years, value_col: values, 'Type': types})
+                    chart_df = pd.DataFrame({
+                        'Year': years,
+                        value_col: values,
+                        'Type': types,
+                        'YearNum': year_nums
+                    })
 
+                    # Bar chart
                     if show_projection:
-                        chart = alt.Chart(chart_df).mark_bar().encode(
+                        bars = alt.Chart(chart_df).mark_bar().encode(
                             x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9), title=None),
                             y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=10, format='~s'), title=None),
                             color=alt.Color('Type:N', scale=alt.Scale(
                                 domain=['Historical', 'Projected'],
                                 range=[color, '#fbbc04']
                             ), legend=None)
-                        ).properties(height=200, title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold'))
+                        )
                     else:
-                        chart = alt.Chart(chart_df).mark_bar(color=color).encode(
+                        bars = alt.Chart(chart_df).mark_bar(color=color).encode(
                             x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9), title=None),
                             y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=10, format='~s'), title=None)
-                        ).properties(height=200, title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold'))
+                        )
+
+                    # Trendline (regression on historical data only)
+                    hist_df = chart_df[chart_df['Type'] == 'Historical'].copy()
+                    if len(hist_df) >= 2:
+                        trendline = alt.Chart(hist_df).transform_regression(
+                            'YearNum', value_col
+                        ).mark_line(
+                            color='#333333',
+                            strokeDash=[4, 4],
+                            strokeWidth=2
+                        ).encode(
+                            x=alt.X('Year:N', sort=None),
+                            y=alt.Y(f'{value_col}:Q')
+                        )
+                        chart = (bars + trendline).properties(
+                            height=200,
+                            title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold')
+                        )
+                    else:
+                        chart = bars.properties(
+                            height=200,
+                            title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold')
+                        )
 
                     return chart
 
