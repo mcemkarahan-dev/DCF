@@ -611,7 +611,12 @@ with tab_analyze:
 
         with c1:
             st.markdown(f"### {result['ticker']}")
-            st.caption(f"{result.get('company_name', '')} • {result.get('sector', 'N/A')}")
+            st.caption(f"{result.get('company_name', '')} • {result.get('sector', 'N/A')} • {result.get('industry', 'N/A')}")
+            description = result.get('description', '')
+            if description:
+                # Truncate to ~200 chars for header display
+                short_desc = description[:200] + "..." if len(description) > 200 else description
+                st.markdown(f"<p style='font-size: 0.85em; color: #64748b; margin-top: -10px;'>{short_desc}</p>", unsafe_allow_html=True)
 
         with c2:
             st.metric("Current Price", f"${result['current_price']:.2f}")
@@ -1109,6 +1114,16 @@ with tab_history:
             if len(filtered_df) > 0:
                 ticker_options = filtered_df['Ticker'].tolist()
                 selected_ticker = st.selectbox("Select Ticker for Details", ticker_options, index=0)
+
+                # Show company description when ticker is selected
+                if selected_ticker:
+                    selected_info = next((r for r in st.session_state.analysis_history if r['ticker'] == selected_ticker), None)
+                    if selected_info:
+                        company_name = selected_info.get('company_name', '')
+                        description = selected_info.get('description', '')
+                        if description:
+                            short_desc = description[:150] + "..." if len(description) > 150 else description
+                            st.markdown(f"<p style='font-size: 0.85em; color: #64748b; margin: 4px 0 8px 0;'><b>{company_name}</b>: {short_desc}</p>", unsafe_allow_html=True)
             else:
                 selected_ticker = None
 
@@ -1417,8 +1432,40 @@ with tab_history:
                             st.caption("Shares: No data")
 
                 with future_col:
-                    # Reserved for future use
-                    pass
+                    # Company info panel
+                    st.markdown("#### Company Info")
+
+                    # Company name and sector
+                    company_name = selected_result.get('company_name', selected_ticker)
+                    sector = selected_result.get('sector', 'N/A')
+                    industry = selected_result.get('industry', 'N/A')
+
+                    st.markdown(f"**{company_name}**")
+                    st.caption(f"{sector} • {industry}")
+
+                    # Key metrics summary
+                    curr_price = selected_result.get('current_price', 0)
+                    intrinsic_val = selected_result.get('intrinsic_value', 0)
+                    discount = selected_result.get('discount', 0)
+                    mkt_cap = selected_result.get('market_cap', 0)
+
+                    st.markdown("---")
+                    st.metric("Current Price", f"${curr_price:.2f}")
+                    st.metric("Intrinsic Value", f"${intrinsic_val:.2f}")
+
+                    if discount > 0:
+                        st.metric("Discount", f"{discount:.1f}%", delta="Undervalued", delta_color="normal")
+                    else:
+                        st.metric("Premium", f"{abs(discount):.1f}%", delta="Overvalued", delta_color="inverse")
+
+                    st.metric("Market Cap", format_market_cap(mkt_cap))
+
+                    # Company description
+                    description = selected_result.get('description', '')
+                    if description:
+                        st.markdown("---")
+                        st.markdown("**About**")
+                        st.markdown(f"<p style='font-size: 0.85em; color: #64748b;'>{description}</p>", unsafe_allow_html=True)
 
 # Footer
 st.markdown("---")

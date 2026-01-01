@@ -694,6 +694,7 @@ class DCFAnalyzer:
             'company_name': profile.get('companyName', ticker),
             'sector': profile.get('sector', 'N/A'),
             'industry': profile.get('industry', 'N/A'),
+            'description': profile.get('description', ''),
             'market_cap': market_cap,
             'intrinsic_value': intrinsic_value,
             'current_price': current_price,

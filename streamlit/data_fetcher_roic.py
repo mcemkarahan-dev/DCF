@@ -62,6 +62,7 @@ class RoicDataFetcher:
             'exchangeShortName': profile.get('exchange_short_name') or profile.get('exchange') or 'N/A',
             'sector': profile.get('sector') or 'N/A',
             'industry': profile.get('industry') or 'N/A',
+            'description': profile.get('description') or '',
             'mktCap': 0  # Will calculate from price * shares if needed
         }
     
