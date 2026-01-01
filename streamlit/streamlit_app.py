@@ -1026,19 +1026,32 @@ with tab_batch:
 
 # ==================== TAB: ANALYSIS HISTORY ====================
 with tab_history:
-    # Storage status and buttons
-    col_status, col_test, col_clear, col_spacer = st.columns([2, 1, 1, 2])
-    with col_status:
-        backend = db_storage.get_storage_backend()
-        history_count = len(st.session_state.analysis_history)
-        st.caption(f"Storage: {backend} | Items: {history_count}")
-    with col_test:
-        if st.button("Test DB", type="secondary"):
-            try:
-                # Show connection info
-                st.info(f"Backend: {db_storage.get_storage_backend()}")
+    # Storage status line
+    backend = db_storage.get_storage_backend()
+    history_count = len(st.session_state.analysis_history)
+    st.caption(f"Storage: {backend} | Items: {history_count}")
 
-                # Test write
+    # Initialize filter state
+    if 'show_positive_iv_only' not in st.session_state:
+        st.session_state.show_positive_iv_only = False
+
+    # All 4 buttons on one line
+    btn_col1, btn_col2, btn_col3, btn_col4, btn_spacer = st.columns([1, 1, 1, 1, 2])
+
+    with btn_col1:
+        # Toggle for positive IV filter
+        if st.button(
+            "✓ +IV Only" if st.session_state.show_positive_iv_only else "+IV Only",
+            type="primary" if st.session_state.show_positive_iv_only else "secondary",
+            use_container_width=True
+        ):
+            st.session_state.show_positive_iv_only = not st.session_state.show_positive_iv_only
+            st.rerun()
+
+    with btn_col2:
+        if st.button("Test DB", type="secondary", use_container_width=True):
+            try:
+                st.info(f"Backend: {db_storage.get_storage_backend()}")
                 test_result = {
                     'ticker': 'TEST',
                     'company_name': 'Test Company',
@@ -1048,26 +1061,28 @@ with tab_history:
                     'discount_pct': 50.0,
                 }
                 db_storage.save_analysis(test_result)
-
-                # Check for errors
                 last_error = db_storage.get_last_db_error()
                 if last_error:
                     st.error(f"Save failed: {last_error}")
                 else:
-                    # Try to read it back
                     loaded = db_storage.get_analysis('TEST')
                     if loaded:
-                        st.success(f"DB works! Saved and loaded TEST ticker.")
-                        # Clean up
+                        st.success(f"DB works!")
                         db_storage.delete_analysis('TEST')
                     else:
-                        st.error("Save succeeded but read failed - check RLS permissions")
+                        st.error("Read failed - check RLS")
             except Exception as e:
                 st.error(f"Test error: {str(e)}")
-    with col_clear:
-        if st.button("Clear History", type="secondary"):
+
+    with btn_col3:
+        if st.button("Clear History", type="secondary", use_container_width=True):
             db_storage.clear_all_history()
             st.session_state.analysis_history = []
+            st.rerun()
+
+    with btn_col4:
+        if st.button("Refresh", type="secondary", use_container_width=True):
+            st.session_state.analysis_history = db_storage.load_all_history(limit=100)
             st.rerun()
 
     if not st.session_state.analysis_history:
@@ -1145,6 +1160,11 @@ with tab_history:
 
             # Apply filters
             filtered_df = history_df.copy()
+
+            # Apply positive IV filter (from button toggle)
+            if st.session_state.show_positive_iv_only:
+                filtered_df = filtered_df[filtered_df['Intrinsic'] > 0]
+
             if selected_universe:
                 filtered_df = filtered_df[filtered_df['Universe'].isin(selected_universe)]
             if selected_sector_filter:
