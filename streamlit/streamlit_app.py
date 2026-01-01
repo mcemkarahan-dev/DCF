@@ -8,6 +8,7 @@ import pandas as pd
 import sys
 import os
 from datetime import datetime
+import time
 
 # Add current directory to Python path for Streamlit Cloud compatibility
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -15,6 +16,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Direct imports - files are in same directory
 from dcf_calculator import DCFAnalyzer
 from config import PRESET_CONFIGS
+from batch_screener import (
+    BatchScreener, FilterCategory, FILTER_DEFINITIONS,
+    get_filters_by_category, get_all_sectors, get_all_exchanges,
+    get_all_market_cap_universes
+)
 
 # Page configuration
 st.set_page_config(
@@ -59,6 +65,12 @@ if 'analysis_history' not in st.session_state:
     st.session_state.analysis_history = []  # List of analysis results (max 100)
 if 'selected_ticker' not in st.session_state:
     st.session_state.selected_ticker = None
+if 'batch_running' not in st.session_state:
+    st.session_state.batch_running = False
+if 'batch_progress' not in st.session_state:
+    st.session_state.batch_progress = 0
+if 'batch_message' not in st.session_state:
+    st.session_state.batch_message = ""
 
 # Try to load API key from Streamlit secrets (for persistence)
 def get_saved_api_key():
@@ -125,6 +137,15 @@ def add_to_history(result):
 # Sidebar - Configuration
 with st.sidebar:
     st.markdown("## Configuration")
+
+    # Analysis Mode Toggle
+    analysis_mode = st.radio(
+        "Analysis Mode",
+        ["Single Ticker", "Batch Analysis"],
+        help="Single: Analyze one stock. Batch: Screen and analyze multiple stocks."
+    )
+
+    st.markdown("---")
 
     # Data Source
     data_source = st.radio(
@@ -254,6 +275,124 @@ with st.sidebar:
         else:
             years_back = 5
 
+    # ==================== BATCH FILTERS (shown only in Batch mode) ====================
+    if analysis_mode == "Batch Analysis":
+        st.markdown("---")
+        st.markdown("## 🔍 Batch Filters")
+
+        # Initialize filter values in session state
+        if 'batch_filters' not in st.session_state:
+            st.session_state.batch_filters = {}
+
+        batch_filters = {}
+
+        # Group filters by category
+        filters_by_category = get_filters_by_category()
+
+        # Basic Filters
+        with st.expander("📌 Basic Filters", expanded=True):
+            batch_filters['sector'] = st.multiselect(
+                "Sector",
+                options=get_all_sectors(),
+                default=[],
+                help="Filter by company sector (leave empty for all)"
+            )
+
+            batch_filters['exchange'] = st.multiselect(
+                "Exchange",
+                options=get_all_exchanges(),
+                default=[],
+                help="Filter by stock exchange (leave empty for all)"
+            )
+
+        # Market Filters
+        with st.expander("📊 Market Filters", expanded=False):
+            batch_filters['market_cap_universe'] = st.multiselect(
+                "Market Cap Universe",
+                options=get_all_market_cap_universes(),
+                default=[],
+                help="Filter by market cap tier (leave empty for all)"
+            )
+
+        # Profitability Filters
+        with st.expander("💰 Profitability Filters", expanded=False):
+            batch_filters['positive_fcf_last_year'] = st.selectbox(
+                "Positive FCF (Last Year)",
+                options=["Any", "Yes", "No"],
+                index=0,
+                help="Require positive FCF in the most recent year"
+            )
+
+            batch_filters['positive_fcf_years_3'] = st.number_input(
+                "Min Positive FCF Years (Last 3)",
+                min_value=0,
+                max_value=3,
+                value=0,
+                step=1,
+                help="Minimum years with positive FCF in last 3 years"
+            )
+
+            batch_filters['positive_fcf_years_5'] = st.number_input(
+                "Min Positive FCF Years (Last 5)",
+                min_value=0,
+                max_value=5,
+                value=0,
+                step=1,
+                help="Minimum years with positive FCF in last 5 years"
+            )
+
+            batch_filters['positive_fcf_years_10'] = st.number_input(
+                "Min Positive FCF Years (Last 10)",
+                min_value=0,
+                max_value=10,
+                value=0,
+                step=1,
+                help="Minimum years with positive FCF in last 10 years"
+            )
+
+            batch_filters['min_gross_margin'] = st.number_input(
+                "Minimum Gross Margin %",
+                min_value=0.0,
+                max_value=100.0,
+                value=0.0,
+                step=5.0,
+                help="Minimum gross margin percentage"
+            )
+
+        # Growth Filters
+        with st.expander("📈 Growth Filters", expanded=False):
+            batch_filters['revenue_growth_years_5'] = st.number_input(
+                "Min Revenue Growth Years (Last 5)",
+                min_value=0,
+                max_value=5,
+                value=0,
+                step=1,
+                help="Minimum years with revenue growth in last 5 years"
+            )
+
+        # Additional Filters (placeholder for future)
+        with st.expander("🔮 Additional Filters", expanded=False):
+            st.caption("More filters coming soon...")
+            st.caption("• Dividend yield range")
+            st.caption("• P/E ratio range")
+            st.caption("• Debt/Equity ratio")
+            st.caption("• ROE/ROIC minimums")
+
+        # Batch options
+        st.markdown("---")
+        st.markdown("### Batch Options")
+
+        max_stocks = st.number_input(
+            "Max Stocks to Analyze",
+            min_value=1,
+            max_value=100,
+            value=20,
+            step=5,
+            help="Maximum number of stocks to analyze after filtering"
+        )
+
+        st.session_state.batch_filters = batch_filters
+
 # Main content - Header
 st.markdown('<p class="main-header">📊 DCF Stock Analyzer</p>', unsafe_allow_html=True)
 st.markdown("Professional discounted cash flow valuation with 30+ years of historical data")
@@ -263,55 +402,178 @@ tab1, tab2 = st.tabs(["Analyze Stock", "Analysis History"])
 
 # ==================== TAB 1: Analyze Stock ====================
 with tab1:
-    # Stock input
-    col1, col2 = st.columns([3, 1])
+    if analysis_mode == "Single Ticker":
+        # ===== SINGLE TICKER MODE =====
+        col1, col2 = st.columns([3, 1])
 
-    with col1:
-        ticker = st.text_input(
-            "Stock Ticker",
-            value="AAPL",
-            max_chars=10,
-            help="Enter stock ticker symbol (e.g., AAPL, MSFT, GOOGL)"
-        ).upper()
+        with col1:
+            ticker = st.text_input(
+                "Stock Ticker",
+                value="AAPL",
+                max_chars=10,
+                help="Enter stock ticker symbol (e.g., AAPL, MSFT, GOOGL)"
+            ).upper()
 
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)  # Spacing
-        analyze_button = st.button("Analyze", type="primary", use_container_width=True)
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            analyze_button = st.button("Analyze", type="primary", use_container_width=True)
 
-    # Analysis
-    if analyze_button:
-        if not ticker:
-            st.error("Please enter a stock ticker")
-        elif "Roic" in data_source and not api_key:
-            st.error("Please enter your Roic.ai API key in the sidebar")
+        # Analysis
+        if analyze_button:
+            if not ticker:
+                st.error("Please enter a stock ticker")
+            elif "Roic" in data_source and not api_key:
+                st.error("Please enter your Roic.ai API key in the sidebar")
+            else:
+                with st.spinner(f"Analyzing {ticker}..."):
+                    try:
+                        source = "roic" if "Roic" in data_source else "yahoo"
+                        analyzer = DCFAnalyzer(api_key=api_key, data_source=source)
+
+                        result = analyzer.analyze_stock(
+                            ticker,
+                            params=params,
+                            years_back=years_back if "Roic" in data_source else None
+                        )
+
+                        st.session_state.analysis_result = result
+                        add_to_history(result)
+
+                    except Exception as e:
+                        st.error(f"Error analyzing {ticker}: {str(e)}")
+                        st.session_state.analysis_result = None
+
+    else:
+        # ===== BATCH ANALYSIS MODE =====
+        st.markdown("### Batch Analysis")
+        st.markdown("Configure filters in the sidebar, then click 'Run Batch Analysis' to screen and analyze stocks.")
+
+        # Show active filters summary
+        batch_filters = st.session_state.get('batch_filters', {})
+        active_filters = []
+
+        if batch_filters.get('sector'):
+            active_filters.append(f"Sectors: {', '.join(batch_filters['sector'])}")
+        if batch_filters.get('exchange'):
+            active_filters.append(f"Exchanges: {', '.join(batch_filters['exchange'])}")
+        if batch_filters.get('market_cap_universe'):
+            active_filters.append(f"Market Cap: {', '.join(batch_filters['market_cap_universe'])}")
+        if batch_filters.get('positive_fcf_last_year') != "Any":
+            active_filters.append(f"Positive FCF Last Year: {batch_filters['positive_fcf_last_year']}")
+        if batch_filters.get('positive_fcf_years_3', 0) > 0:
+            active_filters.append(f"Min FCF Years (3yr): {batch_filters['positive_fcf_years_3']}")
+        if batch_filters.get('positive_fcf_years_5', 0) > 0:
+            active_filters.append(f"Min FCF Years (5yr): {batch_filters['positive_fcf_years_5']}")
+        if batch_filters.get('min_gross_margin', 0) > 0:
+            active_filters.append(f"Min Gross Margin: {batch_filters['min_gross_margin']}%")
+        if batch_filters.get('revenue_growth_years_5', 0) > 0:
+            active_filters.append(f"Min Revenue Growth Years: {batch_filters['revenue_growth_years_5']}")
+
+        if active_filters:
+            st.info("**Active Filters:** " + " | ".join(active_filters))
         else:
-            with st.spinner(f"Analyzing {ticker}..."):
+            st.warning("No filters active. All stocks in the universe will be analyzed (up to max limit).")
+
+        # Run batch button
+        col1, col2, col3 = st.columns([1, 1, 2])
+
+        with col1:
+            run_batch = st.button("🚀 Run Batch Analysis", type="primary", use_container_width=True)
+
+        with col2:
+            stop_batch = st.button("⏹ Stop", use_container_width=True)
+
+        # Progress display
+        if st.session_state.batch_running:
+            st.progress(st.session_state.batch_progress / 100)
+            st.caption(st.session_state.batch_message)
+
+        # Batch execution
+        if run_batch:
+            if "Roic" in data_source and not api_key:
+                st.error("Please enter your Roic.ai API key in the sidebar")
+            else:
+                st.session_state.batch_running = True
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+
                 try:
-                    # Initialize analyzer
                     source = "roic" if "Roic" in data_source else "yahoo"
+                    screener = BatchScreener(data_source=source, api_key=api_key)
                     analyzer = DCFAnalyzer(api_key=api_key, data_source=source)
 
-                    # Run analysis
-                    result = analyzer.analyze_stock(
-                        ticker,
-                        params=params,
-                        years_back=years_back if "Roic" in data_source else None
+                    # Progress callback
+                    def update_progress(current, total, message):
+                        pct = int((current / total) * 100) if total > 0 else 0
+                        progress_bar.progress(pct / 100)
+                        status_text.text(message)
+                        st.session_state.batch_progress = pct
+                        st.session_state.batch_message = message
+
+                    # Screen stocks
+                    update_progress(0, 100, "Starting batch screening...")
+                    max_stocks_val = st.session_state.get('batch_filters', {}).get('max_stocks', 20)
+
+                    # Use the sidebar value if available
+                    try:
+                        max_stocks_val = max_stocks
+                    except:
+                        max_stocks_val = 20
+
+                    filtered_stocks = screener.screen_stocks(
+                        filters=batch_filters,
+                        progress_callback=update_progress,
+                        max_stocks=max_stocks_val
                     )
 
-                    st.session_state.analysis_result = result
+                    # Run DCF on filtered stocks
+                    if filtered_stocks:
+                        status_text.text(f"Running DCF analysis on {len(filtered_stocks)} stocks...")
+                        analyzed_count = 0
 
-                    # Add to history
-                    add_to_history(result)
+                        for i, stock in enumerate(filtered_stocks):
+                            if stop_batch:
+                                status_text.text("Batch stopped by user.")
+                                break
+
+                            ticker_batch = stock['ticker']
+                            pct = int(((i + 1) / len(filtered_stocks)) * 100)
+                            progress_bar.progress(pct / 100)
+                            status_text.text(f"Analyzing {ticker_batch}... ({i+1}/{len(filtered_stocks)})")
+
+                            try:
+                                result = analyzer.analyze_stock(
+                                    ticker_batch,
+                                    params=params,
+                                    years_back=years_back if "Roic" in data_source else None
+                                )
+
+                                if result:
+                                    add_to_history(result)
+                                    analyzed_count += 1
+
+                            except Exception as e:
+                                st.warning(f"Error analyzing {ticker_batch}: {str(e)}")
+
+                            time.sleep(0.5)  # Rate limiting
+
+                        progress_bar.progress(1.0)
+                        status_text.text(f"Batch complete! Analyzed {analyzed_count} stocks. Check the 'Analysis History' tab for results.")
+                        st.success(f"Successfully analyzed {analyzed_count} stocks!")
+                    else:
+                        status_text.text("No stocks matched the filter criteria.")
+                        st.warning("No stocks matched your filters. Try relaxing the criteria.")
 
                 except Exception as e:
-                    st.error(f"Error analyzing {ticker}: {str(e)}")
-                    st.session_state.analysis_result = None
+                    st.error(f"Batch analysis error: {str(e)}")
 
-    # Display results
-    if st.session_state.analysis_result:
+                finally:
+                    st.session_state.batch_running = False
+
+    # Display results (for single ticker mode)
+    if analysis_mode == "Single Ticker" and st.session_state.analysis_result:
         result = st.session_state.analysis_result
 
-        # Company header
         st.markdown("---")
 
         market_cap = result.get('market_cap', 0)
@@ -416,7 +678,7 @@ with tab1:
             })
             st.dataframe(params_df, hide_index=True, use_container_width=True)
 
-    else:
+    elif analysis_mode == "Single Ticker" and not st.session_state.analysis_result:
         # Welcome message
         st.info("👆 Enter a stock ticker and click 'Analyze' to begin")
 
@@ -498,7 +760,7 @@ with tab2:
 
         # ===== TOP HALF: Table 1 with selection =====
         st.markdown("### Analysis History")
-        st.caption("Click on a row to view detailed historical and projected data below")
+        st.caption("Select a ticker to view detailed historical and projected data below")
 
         # Get list of tickers for selection
         ticker_options = [r['ticker'] for r in st.session_state.analysis_history]
@@ -524,7 +786,7 @@ with tab2:
             styled_df,
             hide_index=True,
             use_container_width=True,
-            height=400  # Approximately half screen height
+            height=400
         )
 
         st.markdown("---")
