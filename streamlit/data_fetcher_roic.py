@@ -350,23 +350,63 @@ class RoicDataFetcher:
         """Get list of tickers for a specific exchange"""
         # Roic has a tickers endpoint
         endpoint = "tickers"
-        
+
         data = self._make_request(endpoint)
-        
+
         if not data:
             return []
-        
+
         # Filter by exchange if needed
         tickers = []
         for item in data:
             if exchange and item.get('exchange') != exchange:
                 continue
             tickers.append(item.get('symbol'))
-        
+
         if limit:
             tickers = tickers[:limit]
-        
+
         return tickers
+
+    def get_all_tickers(self) -> List[Dict]:
+        """
+        Get all available tickers from ROIC.ai with full metadata.
+        Returns list of dicts with: symbol, name, sector, exchange, marketCap
+        Used for dynamic batch screening.
+        """
+        endpoint = "tickers"
+
+        data = self._make_request(endpoint)
+
+        if not data:
+            print("Warning: ROIC.ai /tickers endpoint returned no data")
+            return []
+
+        # Return full ticker data with all available fields
+        results = []
+        for item in data:
+            if isinstance(item, dict):
+                ticker_info = {
+                    'symbol': item.get('symbol') or item.get('ticker'),
+                    'name': item.get('name') or item.get('companyName') or item.get('symbol', ''),
+                    'sector': item.get('sector') or 'N/A',
+                    'exchange': item.get('exchange') or item.get('exchangeShortName') or 'N/A',
+                    'marketCap': item.get('marketCap') or item.get('mktCap') or 0,
+                }
+                if ticker_info['symbol']:
+                    results.append(ticker_info)
+            elif isinstance(item, str):
+                # If API returns just strings, create minimal dict
+                results.append({
+                    'symbol': item,
+                    'name': item,
+                    'sector': 'N/A',
+                    'exchange': 'N/A',
+                    'marketCap': 0,
+                })
+
+        print(f"ROIC.ai returned {len(results)} tickers")
+        return results
     
     def calculate_fcf_from_statements(self, cash_flow: Dict) -> float:
         """

@@ -461,30 +461,16 @@ class BatchScreener:
         return stocks
 
     def _get_roic_universe(self, exchange: str = None) -> List[Dict]:
-        """Get stock universe from ROIC.ai, with fallback to built-in list"""
-        try:
-            tickers = self.fetcher.get_exchange_tickers(exchange)
+        """
+        Get stock universe for ROIC.ai mode.
+        Uses comprehensive stock list since ROIC.ai doesn't have a bulk tickers endpoint.
+        Market cap classification is done dynamically via enrichment.
+        """
+        print("Loading comprehensive stock universe for ROIC.ai analysis...")
 
-            if tickers and len(tickers) > 0:
-                stocks = []
-                for ticker in tickers:
-                    stocks.append({
-                        'ticker': ticker,
-                        'name': ticker,
-                        'sector': 'N/A',  # Will be fetched later
-                        'exchange': exchange or 'N/A',
-                        'market_cap': 0,
-                        'market_cap_universe': 'Unknown',
-                    })
-                print(f"Loaded {len(stocks)} stocks from ROIC.ai")
-                return stocks
-            else:
-                print("ROIC.ai returned no tickers, using fallback list")
-                return self._get_yahoo_universe(exchange)
-
-        except Exception as e:
-            print(f"Error fetching ROIC universe: {e}, using fallback list")
-            return self._get_yahoo_universe(exchange)
+        # Use the same comprehensive list - market cap will be enriched dynamically
+        # when market cap filters are applied
+        return self._get_yahoo_universe(exchange)
 
     def enrich_stock_info(self, stock: Dict) -> Dict:
         """
@@ -741,10 +727,10 @@ class BatchScreener:
 
         stocks = self.get_stock_universe()
 
-        print(f"DEBUG: Got {len(stocks)} stocks in universe")
+        # print(f"DEBUG: Got {len(stocks)} stocks in universe")
 
         if not stocks:
-            print("DEBUG: No stocks in universe!")
+            # print("DEBUG: No stocks in universe!")
             if progress_callback:
                 progress_callback(100, 100, "No stocks found in universe", False)
             return
@@ -754,15 +740,15 @@ class BatchScreener:
         need_enrichment = self.needs_enrichment(filters)
         need_financial = self.has_financial_filters(filters)
 
-        print(f"DEBUG: need_enrichment={need_enrichment}, need_financial={need_financial}")
-        print(f"DEBUG: filters={filters}")
+        # print(f"DEBUG: need_enrichment={need_enrichment}, need_financial={need_financial}")
+        # print(f"DEBUG: filters={filters}")
 
         if progress_callback:
             progress_callback(5, 100, f"Screening {total_stocks} stocks...", True)
 
         for i, stock in enumerate(stocks):
             if max_stocks and matched_count >= max_stocks:
-                print(f"DEBUG: Reached max_stocks limit ({max_stocks})")
+                # print(f"DEBUG: Reached max_stocks limit ({max_stocks})")
                 break
 
             # Progress update
@@ -773,8 +759,8 @@ class BatchScreener:
             # Step 1: Basic filters (sector, exchange) - fast, no API call
             passes_basic = self.passes_basic_filters(stock, filters)
             if not passes_basic:
-                if i < 5:  # Debug first few
-                    print(f"DEBUG: {stock['ticker']} failed basic filters (sector={stock.get('sector')}, exchange={stock.get('exchange')})")
+                # if i < 5:  # Debug first few
+                #     print(f"DEBUG: {stock['ticker']} failed basic filters")
                 continue
 
             # Step 2: Enrichment if needed (market cap universe, gross margin)
@@ -800,14 +786,14 @@ class BatchScreener:
 
             # Stock passed all filters!
             matched_count += 1
-            print(f"DEBUG: {stock['ticker']} MATCHED! (count={matched_count})")
+            # print(f"DEBUG: {stock['ticker']} MATCHED! (count={matched_count})")
 
             if match_callback:
                 match_callback(stock)
 
             yield stock
 
-        print(f"DEBUG: Screening complete, {matched_count} stocks matched")
+        # print(f"DEBUG: Screening complete, {matched_count} stocks matched")
         if progress_callback:
             progress_callback(100, 100, f"Screening complete: {matched_count} stocks matched", False)
 
