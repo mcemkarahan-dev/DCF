@@ -7,7 +7,7 @@ import streamlit as st
 import pandas as pd
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 
 # Add current directory to Python path for Streamlit Cloud compatibility
@@ -368,16 +368,57 @@ def format_value(val):
     else:
         return f"${val:,.0f}"
 
-def add_to_history(result):
+def get_params_hash(params):
+    """Create a hash of DCF parameters for comparison"""
+    key_params = (
+        params.get('wacc'),
+        params.get('terminal_growth_rate'),
+        params.get('fcf_growth_rate'),
+        params.get('projection_years'),
+        params.get('conservative_adjustment'),
+        params.get('dcf_input_type'),
+    )
+    return hash(key_params)
+
+def add_to_history(result, params=None):
     """Add analysis result to history (newest first, max 100)"""
     if result is None:
         return
+
+    # Add run metadata
+    result['run_date'] = datetime.now().isoformat()
+    if params:
+        result['params_hash'] = get_params_hash(params)
+
+    # Remove previous entry for same ticker
     st.session_state.analysis_history = [
         r for r in st.session_state.analysis_history
         if r['ticker'] != result['ticker']
     ]
     st.session_state.analysis_history.insert(0, result)
     st.session_state.analysis_history = st.session_state.analysis_history[:100]
+
+def was_recently_analyzed(ticker, params, days=10):
+    """Check if ticker was analyzed with same params within last N days"""
+    if not st.session_state.analysis_history:
+        return False, None
+
+    current_hash = get_params_hash(params)
+    cutoff_date = datetime.now() - timedelta(days=days)
+
+    for r in st.session_state.analysis_history:
+        if r['ticker'] == ticker:
+            run_date_str = r.get('run_date')
+            if run_date_str:
+                try:
+                    run_date = datetime.fromisoformat(run_date_str)
+                    if run_date > cutoff_date:
+                        # Check if params match
+                        if r.get('params_hash') == current_hash:
+                            return True, run_date
+                except:
+                    pass
+    return False, None
 
 # ==================== HEADER ====================
 st.markdown('<p class="main-header">DCF Stock Analyzer</p>', unsafe_allow_html=True)
@@ -517,16 +558,25 @@ with tab_analyze:
         elif "Roic" in data_source and not api_key:
             st.error("Please enter your Roic.ai API key in Settings tab")
         else:
-            with st.spinner(f"Analyzing {ticker}..."):
-                try:
-                    source = "roic" if "Roic" in data_source else "yahoo"
-                    analyzer = DCFAnalyzer(api_key=api_key, data_source=source)
-                    result = analyzer.analyze_stock(ticker, params=params)
-                    st.session_state.analysis_result = result
-                    add_to_history(result)
-                except Exception as e:
-                    st.error(f"Error analyzing {ticker}: {str(e)}")
-                    st.session_state.analysis_result = None
+            # Check if recently analyzed with same params
+            recently_run, last_run_date = was_recently_analyzed(ticker, params)
+            if recently_run:
+                st.warning(f"{ticker} was already analyzed with these parameters on {last_run_date.strftime('%Y-%m-%d %H:%M')}. Showing cached result.")
+                # Show existing result from history
+                existing = next((r for r in st.session_state.analysis_history if r['ticker'] == ticker), None)
+                if existing:
+                    st.session_state.analysis_result = existing
+            else:
+                with st.spinner(f"Analyzing {ticker}..."):
+                    try:
+                        source = "roic" if "Roic" in data_source else "yahoo"
+                        analyzer = DCFAnalyzer(api_key=api_key, data_source=source)
+                        result = analyzer.analyze_stock(ticker, params=params)
+                        st.session_state.analysis_result = result
+                        add_to_history(result, params)
+                    except Exception as e:
+                        st.error(f"Error analyzing {ticker}: {str(e)}")
+                        st.session_state.analysis_result = None
 
     # Display results
     if st.session_state.analysis_result:
@@ -829,23 +879,43 @@ with tab_batch:
                 if filtered_stocks:
                     status_text.text(f"Analyzing {len(filtered_stocks)} stocks...")
 
+                    analyzed_count = 0
+                    skipped_count = 0
+
                     for i, stock in enumerate(filtered_stocks):
                         ticker_batch = stock['ticker']
                         pct = (i + 1) / len(filtered_stocks)
                         progress_bar.progress(pct)
+
+                        # Check if recently analyzed with same params
+                        recently_run, _ = was_recently_analyzed(ticker_batch, params)
+                        if recently_run:
+                            status_text.text(f"Skipping {ticker_batch} (recently analyzed)... ({i+1}/{len(filtered_stocks)})")
+                            skipped_count += 1
+                            time.sleep(0.1)
+                            continue
+
                         status_text.text(f"Analyzing {ticker_batch}... ({i+1}/{len(filtered_stocks)})")
 
                         try:
                             result = analyzer.analyze_stock(ticker_batch, params=params)
                             if result:
-                                add_to_history(result)
+                                add_to_history(result, params)
+                                analyzed_count += 1
                         except Exception as e:
                             print(f"Error analyzing {ticker_batch}: {e}")
 
                         time.sleep(0.3)
 
                     progress_bar.progress(1.0)
-                    status_text.success(f"Done! Analyzed {len(filtered_stocks)} stocks. Check 'Analysis History' tab.")
+                    if analyzed_count > 0 or skipped_count > 0:
+                        msg = f"Done! Analyzed {analyzed_count} stocks"
+                        if skipped_count > 0:
+                            msg += f", skipped {skipped_count} (recently analyzed)"
+                        msg += ". Check 'Analysis History' tab."
+                        status_text.success(msg)
+                    else:
+                        status_text.warning("No new stocks to analyze.")
                 else:
                     status_text.warning("No stocks matched the filter criteria.")
 
@@ -863,6 +933,16 @@ with tab_history:
             dcf_r = r.get('dcf_result', {})
             mkt_cap = r.get('market_cap', 0)
 
+            # Parse run_date
+            run_date_str = r.get('run_date')
+            if run_date_str:
+                try:
+                    run_date = datetime.fromisoformat(run_date_str)
+                except:
+                    run_date = None
+            else:
+                run_date = None
+
             history_data.append({
                 'Ticker': r.get('ticker', ''),
                 'Universe': get_market_cap_universe(mkt_cap),
@@ -872,6 +952,7 @@ with tab_history:
                 'Intrinsic': r.get('intrinsic_value', 0),
                 'Discount': r.get('discount', 0),
                 'Market Cap': mkt_cap,
+                'Last Run': run_date,
             })
 
         history_df = pd.DataFrame(history_data)
@@ -931,6 +1012,7 @@ with tab_history:
                 "Intrinsic": st.column_config.NumberColumn("Intrinsic", format="$%.2f", width="small"),
                 "Discount": st.column_config.NumberColumn("Discount", format="%.1f%%", width="small"),
                 "Market Cap": st.column_config.NumberColumn("Mkt Cap", format="$%.0f", width="medium"),
+                "Last Run": st.column_config.DatetimeColumn("Last Run", format="MM/DD/YY HH:mm", width="medium"),
             }
         )
 
