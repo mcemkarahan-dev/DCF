@@ -1087,11 +1087,12 @@ with tab_history:
                 # Modern, understated color palette
                 COLOR_HISTORICAL = '#64748b'      # Slate gray for historical bars
                 COLOR_PROJECTED = '#94a3b8'       # Lighter slate for projections
-                COLOR_TREND_HIST = '#1e293b'      # Dark slate for historical trendline
-                COLOR_TREND_PROJ = '#059669'      # Muted green for projection trendline
+                COLOR_TREND_HIST = '#3b82f6'      # Modern blue for historical trendline
+                COLOR_TREND_PROJ = '#f97316'      # Modern orange for projection trendline
+                COLOR_LABEL = '#475569'           # Slate for data labels
 
                 # Helper function to create compact charts with trendline
-                def create_mini_chart(data, value_col, title, is_currency=True, is_percent=False, show_projection=False, projections=None, last_year=None):
+                def create_mini_chart(data, value_col, title, is_currency=True, is_percent=False, show_projection=False, projections=None, last_year=None, vertical_labels=False):
                     if not data:
                         return None
 
@@ -1122,11 +1123,37 @@ with tab_history:
                     if not years:
                         return None
 
+                    # Format labels based on value type
+                    def format_label(val):
+                        if is_percent:
+                            return f'{val:.0f}%'
+                        elif is_currency:
+                            if abs(val) >= 1e12:
+                                return f'${val/1e12:.1f}T'
+                            elif abs(val) >= 1e9:
+                                return f'${val/1e9:.1f}B'
+                            elif abs(val) >= 1e6:
+                                return f'${val/1e6:.1f}M'
+                            elif abs(val) >= 1000:
+                                return f'${val/1000:.0f}K'
+                            else:
+                                return f'${val:.1f}'
+                        else:
+                            if abs(val) >= 1e9:
+                                return f'{val/1e9:.1f}B'
+                            elif abs(val) >= 1e6:
+                                return f'{val/1e6:.1f}M'
+                            else:
+                                return f'{val:,.0f}'
+
+                    labels = [format_label(v) for v in values]
+
                     chart_df = pd.DataFrame({
                         'Year': years,
                         value_col: values,
                         'Type': types,
-                        'YearNum': year_nums
+                        'YearNum': year_nums,
+                        'Label': labels
                     })
 
                     # Y-axis format: $M/B/T for currency, % for percent, plain for others
@@ -1177,8 +1204,26 @@ with tab_history:
                             y=alt.Y(f'{value_col}:Q', axis=y_axis, title=None)
                         )
 
+                    # Data labels on bars
+                    label_angle = 270 if vertical_labels else 0
+                    label_align = 'left' if vertical_labels else 'center'
+                    label_dy = -5 if vertical_labels else -8
+
+                    data_labels = alt.Chart(chart_df).mark_text(
+                        align=label_align,
+                        baseline='bottom' if not vertical_labels else 'middle',
+                        angle=label_angle,
+                        fontSize=8,
+                        color=COLOR_LABEL,
+                        dy=label_dy
+                    ).encode(
+                        x=alt.X('Year:N', sort=None),
+                        y=alt.Y(f'{value_col}:Q'),
+                        text='Label:N'
+                    )
+
                     # Build chart with trendlines
-                    layers = [bars]
+                    layers = [bars, data_labels]
 
                     # Historical trendline
                     if len(hist_df) >= 2 and 'Trend' in hist_df.columns:
@@ -1235,7 +1280,8 @@ with tab_history:
                         fcf_chart = create_mini_chart(
                             historical_data, input_label, f'{input_label} (w/ Proj)',
                             is_currency=True, show_projection=True,
-                            projections=fcf_projections, last_year=last_year
+                            projections=fcf_projections, last_year=last_year,
+                            vertical_labels=True
                         )
                         if fcf_chart:
                             st.altair_chart(fcf_chart, use_container_width=True)
