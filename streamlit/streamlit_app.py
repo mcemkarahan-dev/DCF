@@ -880,7 +880,6 @@ with tab_batch:
             matched_tickers = []
             checked_count = [0]  # Use list to allow mutation in nested function
             total_count = [0]  # Track total for display
-            skipped_in_history = [0]  # Track skipped due to being in history
             skipped_recently_checked = [0]  # Track skipped due to recent check
 
             # Get set of tickers already in history to skip
@@ -914,16 +913,9 @@ with tab_batch:
 
                 def on_match(stock):
                     ticker = stock['ticker']
-                    # Skip if already in history
-                    if ticker in existing_tickers:
-                        skipped_in_history[0] += 1
-                        return  # Don't add to matched list
-
                     matched_tickers.append(ticker)
                     match_pct = (len(matched_tickers) / checked_count[0] * 100) if checked_count[0] > 0 else 0
                     skip_text = ""
-                    if skipped_in_history[0] > 0:
-                        skip_text += f" | **In History:** {skipped_in_history[0]}"
                     if skipped_recently_checked[0] > 0:
                         skip_text += f" | **Cached:** {skipped_recently_checked[0]}"
                     stats_display.markdown(
@@ -935,6 +927,9 @@ with tab_batch:
                     """Save each checked ticker to avoid re-checking"""
                     db_storage.save_checked_ticker(ticker, batch_filters, matched)
 
+                # Combine all tickers to skip: recently checked + already in history
+                all_skip_tickers = recently_checked | existing_tickers
+
                 # Screen stocks
                 status_text.text("Screening stocks...")
                 all_matched = list(screener.screen_stocks_streaming(
@@ -942,18 +937,12 @@ with tab_batch:
                     progress_callback=update_progress,
                     match_callback=on_match,
                     checked_callback=on_checked,
-                    exclude_tickers=recently_checked,
-                    max_stocks=max_stocks + len(existing_tickers)  # Request extra to account for skips
+                    exclude_tickers=all_skip_tickers,
+                    max_stocks=max_stocks
                 ))
 
-                # Filter out stocks already in history
-                filtered_stocks = [s for s in all_matched if s['ticker'] not in existing_tickers]
-
-                # Final stats
-                if skipped_in_history[0] > 0:
-                    stats_display.markdown(
-                        f"**Screening complete** | **New matches:** {len(filtered_stocks)} | **Skipped (in history):** {skipped_in_history[0]}"
-                    )
+                # filtered_stocks is same as all_matched since we excluded at screener level
+                filtered_stocks = all_matched
 
                 # Analyze matched stocks
                 if filtered_stocks:
@@ -979,16 +968,10 @@ with tab_batch:
                         time.sleep(0.3)
 
                     progress_bar.progress(1.0)
-                    msg = f"Done! Analyzed {analyzed_count} new stocks"
-                    if skipped_in_history[0] > 0:
-                        msg += f", skipped {skipped_in_history[0]} (already in history)"
-                    msg += ". Check 'Analysis History' tab."
+                    msg = f"Done! Analyzed {analyzed_count} new stocks. Check 'Analysis History' tab."
                     status_text.success(msg)
                 else:
-                    if skipped_in_history[0] > 0:
-                        status_text.warning(f"No new stocks to analyze. {skipped_in_history[0]} skipped (already in history).")
-                    else:
-                        status_text.warning("No stocks matched the filter criteria.")
+                    status_text.warning("No stocks matched the filter criteria.")
 
             except Exception as e:
                 st.error(f"Error: {str(e)}")
