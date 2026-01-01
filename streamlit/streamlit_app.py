@@ -979,64 +979,87 @@ with tab_history:
 
         history_df = pd.DataFrame(history_data)
 
-        # ===== FILTERS FOR TABLE =====
-        filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 2])
+        # Format Market Cap with M/B/T notation
+        def format_mkt_cap(val):
+            if val >= 1e12:
+                return f"${val/1e12:.1f}T"
+            elif val >= 1e9:
+                return f"${val/1e9:.1f}B"
+            elif val >= 1e6:
+                return f"${val/1e6:.1f}M"
+            else:
+                return f"${val:,.0f}"
 
-        with filter_col1:
-            # Universe filter
-            universe_options = sorted(history_df['Universe'].unique().tolist())
-            selected_universe = st.multiselect(
-                "Filter by Universe",
-                options=universe_options,
-                default=[],
-                placeholder="All Universes"
+        history_df['Mkt Cap'] = history_df['Market Cap'].apply(format_mkt_cap)
+
+        # Table width matches charts (2/3 of display)
+        table_col, table_spacer = st.columns([2, 1])
+
+        with table_col:
+            # ===== FILTERS FOR TABLE =====
+            filter_col1, filter_col2 = st.columns(2)
+
+            with filter_col1:
+                # Universe filter
+                universe_options = sorted(history_df['Universe'].unique().tolist())
+                selected_universe = st.multiselect(
+                    "Filter by Universe",
+                    options=universe_options,
+                    default=[],
+                    placeholder="All Universes"
+                )
+
+            with filter_col2:
+                # Sector filter
+                sector_options = sorted(history_df['Sector'].unique().tolist())
+                selected_sector_filter = st.multiselect(
+                    "Filter by Sector",
+                    options=sector_options,
+                    default=[],
+                    placeholder="All Sectors"
+                )
+
+            # Apply filters
+            filtered_df = history_df.copy()
+            if selected_universe:
+                filtered_df = filtered_df[filtered_df['Universe'].isin(selected_universe)]
+            if selected_sector_filter:
+                filtered_df = filtered_df[filtered_df['Sector'].isin(selected_sector_filter)]
+
+            # Show count
+            st.caption(f"Showing {len(filtered_df)} of {len(history_df)} stocks")
+
+            # Selection for details
+            if len(filtered_df) > 0:
+                ticker_options = filtered_df['Ticker'].tolist()
+                selected_ticker = st.selectbox("Select Ticker for Details", ticker_options, index=0)
+            else:
+                selected_ticker = None
+
+            # Drop raw Market Cap column, keep formatted Mkt Cap
+            display_df = filtered_df.drop(columns=['Market Cap'])
+
+            # Display table with sorting enabled via column_config
+            st.dataframe(
+                display_df,
+                hide_index=True,
+                use_container_width=True,
+                height=350,
+                column_config={
+                    "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                    "Universe": st.column_config.TextColumn("Universe", width="small"),
+                    "Sector": st.column_config.TextColumn("Sector", width="small"),
+                    "Company": st.column_config.TextColumn("Company", width="medium"),
+                    "Price": st.column_config.NumberColumn("Price", format="$%.2f", width="small"),
+                    "Intrinsic": st.column_config.NumberColumn("Intrinsic", format="$%.2f", width="small"),
+                    "Discount": st.column_config.NumberColumn("Discount", format="%.1f%%", width="small"),
+                    "Mkt Cap": st.column_config.TextColumn("Mkt Cap", width="small"),
+                    "Last Run": st.column_config.DatetimeColumn("Last Run", format="MM/DD/YY HH:mm", width="small"),
+                }
             )
 
-        with filter_col2:
-            # Sector filter
-            sector_options = sorted(history_df['Sector'].unique().tolist())
-            selected_sector_filter = st.multiselect(
-                "Filter by Sector",
-                options=sector_options,
-                default=[],
-                placeholder="All Sectors"
-            )
-
-        # Apply filters
-        filtered_df = history_df.copy()
-        if selected_universe:
-            filtered_df = filtered_df[filtered_df['Universe'].isin(selected_universe)]
-        if selected_sector_filter:
-            filtered_df = filtered_df[filtered_df['Sector'].isin(selected_sector_filter)]
-
-        # Show count
-        st.caption(f"Showing {len(filtered_df)} of {len(history_df)} stocks")
-
-        # Selection for details
-        if len(filtered_df) > 0:
-            ticker_options = filtered_df['Ticker'].tolist()
-            selected_ticker = st.selectbox("Select Ticker for Details", ticker_options, index=0)
-        else:
-            selected_ticker = None
-
-        # Display table with sorting enabled via column_config
-        st.dataframe(
-            filtered_df,
-            hide_index=True,
-            use_container_width=True,
-            height=350,
-            column_config={
-                "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-                "Universe": st.column_config.TextColumn("Universe", width="medium"),
-                "Sector": st.column_config.TextColumn("Sector", width="medium"),
-                "Company": st.column_config.TextColumn("Company", width="medium"),
-                "Price": st.column_config.NumberColumn("Price", format="$%.2f", width="small"),
-                "Intrinsic": st.column_config.NumberColumn("Intrinsic", format="$%.2f", width="small"),
-                "Discount": st.column_config.NumberColumn("Discount", format="%.1f%%", width="small"),
-                "Market Cap": st.column_config.NumberColumn("Mkt Cap", format="$%.0f", width="medium"),
-                "Last Run": st.column_config.DatetimeColumn("Last Run", format="MM/DD/YY HH:mm", width="medium"),
-            }
-        )
+        with table_spacer:
+            pass  # Reserved space
 
         st.markdown("---")
 
@@ -1053,7 +1076,7 @@ with tab_history:
                 st.markdown(f"### {selected_ticker} - Financial History")
 
                 # Helper function to create compact charts with trendline
-                def create_mini_chart(data, value_col, title, color='#1a73e8', format_type='currency', show_projection=False, projections=None, last_year=None):
+                def create_mini_chart(data, value_col, title, color='#1a73e8', is_currency=True, is_percent=False, show_projection=False, projections=None, last_year=None):
                     if not data:
                         return None
 
@@ -1083,11 +1106,27 @@ with tab_history:
                         'YearNum': year_nums
                     })
 
+                    # Y-axis format: $M/B/T for currency, % for percent, plain for others
+                    if is_currency:
+                        # Custom JavaScript expression for $M/B/T format
+                        y_axis = alt.Axis(
+                            labelFontSize=10,
+                            labelExpr="abs(datum.value) >= 1e12 ? '$' + format(datum.value/1e12, '.1f') + 'T' : abs(datum.value) >= 1e9 ? '$' + format(datum.value/1e9, '.1f') + 'B' : abs(datum.value) >= 1e6 ? '$' + format(datum.value/1e6, '.1f') + 'M' : '$' + format(datum.value, ',.0f')"
+                        )
+                    elif is_percent:
+                        y_axis = alt.Axis(labelFontSize=10, format='.1f')
+                    else:
+                        # For shares - use B/M notation without $
+                        y_axis = alt.Axis(
+                            labelFontSize=10,
+                            labelExpr="datum.value >= 1e9 ? format(datum.value/1e9, '.1f') + 'B' : datum.value >= 1e6 ? format(datum.value/1e6, '.1f') + 'M' : format(datum.value, ',.0f')"
+                        )
+
                     # Bar chart
                     if show_projection:
                         bars = alt.Chart(chart_df).mark_bar().encode(
                             x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9), title=None),
-                            y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=10, format='~s'), title=None),
+                            y=alt.Y(f'{value_col}:Q', axis=y_axis, title=None),
                             color=alt.Color('Type:N', scale=alt.Scale(
                                 domain=['Historical', 'Projected'],
                                 range=[color, '#fbbc04']
@@ -1096,7 +1135,7 @@ with tab_history:
                     else:
                         bars = alt.Chart(chart_df).mark_bar(color=color).encode(
                             x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9), title=None),
-                            y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=10, format='~s'), title=None)
+                            y=alt.Y(f'{value_col}:Q', axis=y_axis, title=None)
                         )
 
                     # Trendline (regression on historical data only)
@@ -1147,7 +1186,7 @@ with tab_history:
                     with r1c1:
                         fcf_chart = create_mini_chart(
                             historical_data, input_label, f'{input_label} (w/ Proj)',
-                            color='#1a73e8', show_projection=True,
+                            color='#1a73e8', is_currency=True, show_projection=True,
                             projections=fcf_projections, last_year=last_year
                         )
                         if fcf_chart:
@@ -1156,7 +1195,7 @@ with tab_history:
                     with r1c2:
                         rev_chart = create_mini_chart(
                             revenue_history, 'Revenue', 'Revenue',
-                            color='#34a853'
+                            color='#34a853', is_currency=True
                         )
                         if rev_chart:
                             st.altair_chart(rev_chart, use_container_width=True)
@@ -1168,7 +1207,7 @@ with tab_history:
                     with r2c1:
                         gm_chart = create_mini_chart(
                             gross_margin_history, 'Margin %', 'Gross Margin %',
-                            color='#673ab7'
+                            color='#673ab7', is_currency=False, is_percent=True
                         )
                         if gm_chart:
                             st.altair_chart(gm_chart, use_container_width=True)
@@ -1178,7 +1217,7 @@ with tab_history:
                     with r2c2:
                         debt_chart = create_mini_chart(
                             debt_history, 'Debt', 'Total Debt',
-                            color='#ea4335'
+                            color='#ea4335', is_currency=True
                         )
                         if debt_chart:
                             st.altair_chart(debt_chart, use_container_width=True)
@@ -1190,7 +1229,7 @@ with tab_history:
                     with r3c1:
                         capex_chart = create_mini_chart(
                             capex_history, 'Capex', 'Capex',
-                            color='#ff9800'
+                            color='#ff9800', is_currency=True
                         )
                         if capex_chart:
                             st.altair_chart(capex_chart, use_container_width=True)
@@ -1200,7 +1239,7 @@ with tab_history:
                     with r3c2:
                         shares_chart = create_mini_chart(
                             shares_history, 'Shares', 'Shares Outstanding',
-                            color='#00bcd4'
+                            color='#00bcd4', is_currency=False, is_percent=False
                         )
                         if shares_chart:
                             st.altair_chart(shares_chart, use_container_width=True)
