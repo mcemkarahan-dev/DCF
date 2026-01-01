@@ -877,6 +877,10 @@ with tab_batch:
             matched_tickers = []
             checked_count = [0]  # Use list to allow mutation in nested function
             total_count = [0]  # Track total for display
+            skipped_in_history = [0]  # Track skipped due to being in history
+
+            # Get set of tickers already in history to skip
+            existing_tickers = set(r['ticker'] for r in st.session_state.analysis_history)
 
             try:
                 source = "roic" if "Roic" in data_source else "yahoo"
@@ -897,41 +901,48 @@ with tab_batch:
                         )
 
                 def on_match(stock):
-                    matched_tickers.append(stock['ticker'])
+                    ticker = stock['ticker']
+                    # Skip if already in history
+                    if ticker in existing_tickers:
+                        skipped_in_history[0] += 1
+                        return  # Don't add to matched list
+
+                    matched_tickers.append(ticker)
                     match_pct = (len(matched_tickers) / checked_count[0] * 100) if checked_count[0] > 0 else 0
+                    skip_text = f" | **Skipped:** {skipped_in_history[0]}" if skipped_in_history[0] > 0 else ""
                     stats_display.markdown(
-                        f"**Checked:** {checked_count[0]:,} / {total_count[0]:,} | **Matched:** {len(matched_tickers)} | **Match Rate:** {match_pct:.1f}%"
+                        f"**Checked:** {checked_count[0]:,} / {total_count[0]:,} | **Matched:** {len(matched_tickers)}{skip_text} | **Match Rate:** {match_pct:.1f}%"
                     )
                     matched_display.success(f"**Matched Tickers:** {', '.join(matched_tickers)}")
 
                 # Screen stocks
                 status_text.text("Screening stocks...")
-                filtered_stocks = list(screener.screen_stocks_streaming(
+                all_matched = list(screener.screen_stocks_streaming(
                     filters=batch_filters,
                     progress_callback=update_progress,
                     match_callback=on_match,
-                    max_stocks=max_stocks
+                    max_stocks=max_stocks + len(existing_tickers)  # Request extra to account for skips
                 ))
+
+                # Filter out stocks already in history
+                filtered_stocks = [s for s in all_matched if s['ticker'] not in existing_tickers]
+
+                # Final stats
+                if skipped_in_history[0] > 0:
+                    stats_display.markdown(
+                        f"**Screening complete** | **New matches:** {len(filtered_stocks)} | **Skipped (in history):** {skipped_in_history[0]}"
+                    )
 
                 # Analyze matched stocks
                 if filtered_stocks:
-                    status_text.text(f"Analyzing {len(filtered_stocks)} stocks...")
+                    status_text.text(f"Analyzing {len(filtered_stocks)} new stocks...")
 
                     analyzed_count = 0
-                    skipped_count = 0
 
                     for i, stock in enumerate(filtered_stocks):
                         ticker_batch = stock['ticker']
                         pct = (i + 1) / len(filtered_stocks)
                         progress_bar.progress(pct)
-
-                        # Check if recently analyzed with same params
-                        recently_run, _ = was_recently_analyzed(ticker_batch, params)
-                        if recently_run:
-                            status_text.text(f"Skipping {ticker_batch} (recently analyzed)... ({i+1}/{len(filtered_stocks)})")
-                            skipped_count += 1
-                            time.sleep(0.1)
-                            continue
 
                         status_text.text(f"Analyzing {ticker_batch}... ({i+1}/{len(filtered_stocks)})")
 
@@ -946,16 +957,16 @@ with tab_batch:
                         time.sleep(0.3)
 
                     progress_bar.progress(1.0)
-                    if analyzed_count > 0 or skipped_count > 0:
-                        msg = f"Done! Analyzed {analyzed_count} stocks"
-                        if skipped_count > 0:
-                            msg += f", skipped {skipped_count} (recently analyzed)"
-                        msg += ". Check 'Analysis History' tab."
-                        status_text.success(msg)
-                    else:
-                        status_text.warning("No new stocks to analyze.")
+                    msg = f"Done! Analyzed {analyzed_count} new stocks"
+                    if skipped_in_history[0] > 0:
+                        msg += f", skipped {skipped_in_history[0]} (already in history)"
+                    msg += ". Check 'Analysis History' tab."
+                    status_text.success(msg)
                 else:
-                    status_text.warning("No stocks matched the filter criteria.")
+                    if skipped_in_history[0] > 0:
+                        status_text.warning(f"No new stocks to analyze. {skipped_in_history[0]} skipped (already in history).")
+                    else:
+                        status_text.warning("No stocks matched the filter criteria.")
 
             except Exception as e:
                 st.error(f"Error: {str(e)}")
