@@ -294,7 +294,7 @@ with tab_settings:
 # Get current settings
 data_source = st.session_state.get('data_source', "Roic.ai (30+ years)")
 api_key = st.session_state.get('api_key', '')
-params = st.session_state.get('custom_params', PRESET_CONFIGS['Conservative'])
+params = st.session_state.get('custom_params', PRESET_CONFIGS['conservative'])
 
 # ==================== TAB: ANALYZE STOCK ====================
 with tab_analyze:
