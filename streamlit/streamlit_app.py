@@ -1419,13 +1419,19 @@ with tab_history:
                 # Get data from dcf_result
                 historical_data = dcf_selected.get('historical_data', [])
                 fcf_projections = dcf_selected.get('fcf_projections', [])
+                total_fcf_history = dcf_selected.get('total_fcf_history', [])
                 revenue_history = dcf_selected.get('revenue_history', [])
+                ebit_history = dcf_selected.get('ebit_history', [])
                 gross_margin_history = dcf_selected.get('gross_margin_history', [])
-                debt_history = dcf_selected.get('debt_history', [])
+                operating_margin_history = dcf_selected.get('operating_margin_history', [])
                 capex_history = dcf_selected.get('capex_history', [])
+                debt_history = dcf_selected.get('debt_history', [])
+                dividend_history = dcf_selected.get('dividend_history', [])
                 shares_history = dcf_selected.get('shares_history', [])
 
-                if historical_data:
+                if total_fcf_history:
+                    last_year = max(h[0] for h in total_fcf_history)
+                elif historical_data:
                     last_year = max(h[0] for h in historical_data)
                 else:
                     last_year = datetime.now().year - 1
@@ -1434,17 +1440,19 @@ with tab_history:
                 charts_col, spacer_col, info_col = st.columns([1.8, 0.1, 0.6])
 
                 with charts_col:
-                    # Row 1: FCF, Revenue
+                    # Row 1: Total FCF (with projections), Revenue
                     r1c1, r1c2 = st.columns(2)
                     with r1c1:
                         fcf_chart = create_mini_chart(
-                            historical_data, input_label, f'{input_label} (w/ Proj)',
+                            total_fcf_history, 'Total FCF', 'Total FCF (w/ Proj)',
                             is_currency=True, show_projection=True,
                             projections=fcf_projections, last_year=last_year,
                             vertical_labels=True
                         )
                         if fcf_chart:
                             st.altair_chart(fcf_chart, use_container_width=True)
+                        elif not total_fcf_history:
+                            st.caption("Total FCF: No data")
 
                     with r1c2:
                         rev_chart = create_mini_chart(
@@ -1456,9 +1464,19 @@ with tab_history:
                         elif not revenue_history:
                             st.caption("Revenue: No data")
 
-                    # Row 2: Gross Margin, Debt
+                    # Row 2: EBIT, Gross Margin %
                     r2c1, r2c2 = st.columns(2)
                     with r2c1:
+                        ebit_chart = create_mini_chart(
+                            ebit_history, 'EBIT', 'EBIT (Operating Income)',
+                            is_currency=True
+                        )
+                        if ebit_chart:
+                            st.altair_chart(ebit_chart, use_container_width=True)
+                        elif not ebit_history:
+                            st.caption("EBIT: No data")
+
+                    with r2c2:
                         gm_chart = create_mini_chart(
                             gross_margin_history, 'Margin %', 'Gross Margin %',
                             is_currency=False, is_percent=True
@@ -1468,19 +1486,19 @@ with tab_history:
                         elif not gross_margin_history:
                             st.caption("Gross Margin: No data")
 
-                    with r2c2:
-                        debt_chart = create_mini_chart(
-                            debt_history, 'Debt', 'Total Debt',
-                            is_currency=True
-                        )
-                        if debt_chart:
-                            st.altair_chart(debt_chart, use_container_width=True)
-                        elif not debt_history:
-                            st.caption("Debt: No data")
-
-                    # Row 3: Capex, Shares Outstanding
+                    # Row 3: Operating Margin %, Capex
                     r3c1, r3c2 = st.columns(2)
                     with r3c1:
+                        op_margin_chart = create_mini_chart(
+                            operating_margin_history, 'Op Margin %', 'Operating Margin %',
+                            is_currency=False, is_percent=True
+                        )
+                        if op_margin_chart:
+                            st.altair_chart(op_margin_chart, use_container_width=True)
+                        elif not operating_margin_history:
+                            st.caption("Operating Margin: No data")
+
+                    with r3c2:
                         capex_chart = create_mini_chart(
                             capex_history, 'Capex', 'Capex',
                             is_currency=True
@@ -1490,7 +1508,31 @@ with tab_history:
                         elif not capex_history:
                             st.caption("Capex: No data")
 
-                    with r3c2:
+                    # Row 4: Total Debt, Dividends Paid
+                    r4c1, r4c2 = st.columns(2)
+                    with r4c1:
+                        debt_chart = create_mini_chart(
+                            debt_history, 'Debt', 'Total Debt',
+                            is_currency=True
+                        )
+                        if debt_chart:
+                            st.altair_chart(debt_chart, use_container_width=True)
+                        elif not debt_history:
+                            st.caption("Debt: No data")
+
+                    with r4c2:
+                        dividend_chart = create_mini_chart(
+                            dividend_history, 'Dividends', 'Dividends Paid',
+                            is_currency=True
+                        )
+                        if dividend_chart:
+                            st.altair_chart(dividend_chart, use_container_width=True)
+                        elif not dividend_history:
+                            st.caption("Dividends: No data")
+
+                    # Row 5: Shares Outstanding
+                    r5c1, r5c2 = st.columns(2)
+                    with r5c1:
                         shares_chart = create_mini_chart(
                             shares_history, 'Shares', 'Shares Outstanding',
                             is_currency=False, is_percent=False

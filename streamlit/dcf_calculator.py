@@ -444,6 +444,24 @@ class DCFCalculator:
                 margin = (gross_profit / revenue) * 100
                 gross_margin_history.append((year, margin))
 
+        # EBIT history (Operating Income)
+        ebit_history = []
+        for inc in income_statements[:10]:
+            year = parse_year(inc.get('date'))
+            operating_income = inc.get('operatingIncome', 0) or 0
+            if year:
+                ebit_history.append((year, operating_income))
+
+        # Operating Margin % history (Operating Income / Revenue * 100)
+        operating_margin_history = []
+        for inc in income_statements[:10]:
+            year = parse_year(inc.get('date'))
+            revenue = inc.get('revenue', 0) or 0
+            operating_income = inc.get('operatingIncome', 0) or 0
+            if year and revenue > 0:
+                op_margin = (operating_income / revenue) * 100
+                operating_margin_history.append((year, op_margin))
+
         # Debt history
         debt_history = []
         for bs in balance_sheets[:10]:
@@ -462,6 +480,22 @@ class DCFCalculator:
                 if capex > 0:
                     capex = -capex  # Ensure it's negative (cash outflow)
                 capex_history.append((year, capex))
+
+        # Total FCF history (not per share)
+        total_fcf_history = []
+        for cf in cash_flows[:10]:
+            year = parse_year(cf.get('date'))
+            fcf = cf.get('freeCashFlow', 0) or 0
+            if year:
+                total_fcf_history.append((year, fcf))
+
+        # Dividend history
+        dividend_history = []
+        for cf in cash_flows[:10]:
+            year = parse_year(cf.get('date'))
+            dividends = cf.get('dividendsPaid', 0) or 0
+            if year:
+                dividend_history.append((year, dividends))
 
         # Shares outstanding history
         shares_history = []
@@ -499,8 +533,12 @@ class DCFCalculator:
             # Add additional historical series for charting
             dcf_result['revenue_history'] = sorted(revenue_history, key=lambda x: x[0])
             dcf_result['gross_margin_history'] = sorted(gross_margin_history, key=lambda x: x[0])
+            dcf_result['ebit_history'] = sorted(ebit_history, key=lambda x: x[0])
+            dcf_result['operating_margin_history'] = sorted(operating_margin_history, key=lambda x: x[0])
             dcf_result['debt_history'] = sorted(debt_history, key=lambda x: x[0])
             dcf_result['capex_history'] = sorted(capex_history, key=lambda x: x[0])
+            dcf_result['total_fcf_history'] = sorted(total_fcf_history, key=lambda x: x[0])
+            dcf_result['dividend_history'] = sorted(dividend_history, key=lambda x: x[0])
             dcf_result['shares_history'] = sorted(shares_history, key=lambda x: x[0])
         
         if not dcf_result:

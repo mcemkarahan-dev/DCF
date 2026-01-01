@@ -250,19 +250,28 @@ class RoicDataFetcher:
             
             # Check if roic already provides FCF
             fcf = to_float(item.get('cf_free_cash_flow'))
-            
+
             # If not, calculate it
             if fcf == 0 and (operating_cf != 0 or capex != 0):
                 # Ensure capex is negative
                 if capex > 0:
                     capex = -capex
                 fcf = operating_cf + capex
-            
+
+            # Dividends paid (usually negative in cash flow statement)
+            dividends = to_float(
+                item.get('cf_dividends_paid') or
+                item.get('cf_div_paid') or
+                item.get('dividendsPaid') or
+                item.get('commonStockDividendPaid') or 0
+            )
+
             results.append({
                 'date': item.get('date'),
                 'operatingCashFlow': operating_cf,
                 'capitalExpenditure': capex if capex < 0 else -capex,
                 'freeCashFlow': fcf,
+                'dividendsPaid': abs(dividends),  # Store as positive for display
                 'period': period
             })
         
