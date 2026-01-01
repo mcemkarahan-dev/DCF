@@ -1003,24 +1003,36 @@ with tab_history:
         st.caption(f"Storage: {backend} | Items: {history_count}")
     with col_test:
         if st.button("Test DB", type="secondary"):
-            # Test write and read
-            test_result = {
-                'ticker': 'TEST',
-                'company_name': 'Test Company',
-                'run_date': datetime.now().isoformat(),
-                'intrinsic_value': 100.0,
-                'current_price': 50.0,
-                'discount_pct': 50.0,
-            }
-            db_storage.save_analysis(test_result)
-            # Try to read it back
-            loaded = db_storage.get_analysis('TEST')
-            if loaded:
-                st.success(f"DB works! Saved and loaded TEST ticker.")
-                # Clean up
-                db_storage.delete_analysis('TEST')
-            else:
-                st.error("DB test failed - could not read back saved data.")
+            try:
+                # Show connection info
+                st.info(f"Backend: {db_storage.get_storage_backend()}")
+
+                # Test write
+                test_result = {
+                    'ticker': 'TEST',
+                    'company_name': 'Test Company',
+                    'run_date': datetime.now().isoformat(),
+                    'intrinsic_value': 100.0,
+                    'current_price': 50.0,
+                    'discount_pct': 50.0,
+                }
+                db_storage.save_analysis(test_result)
+
+                # Check for errors
+                last_error = db_storage.get_last_db_error()
+                if last_error:
+                    st.error(f"Save failed: {last_error}")
+                else:
+                    # Try to read it back
+                    loaded = db_storage.get_analysis('TEST')
+                    if loaded:
+                        st.success(f"DB works! Saved and loaded TEST ticker.")
+                        # Clean up
+                        db_storage.delete_analysis('TEST')
+                    else:
+                        st.error("Save succeeded but read failed - check RLS permissions")
+            except Exception as e:
+                st.error(f"Test error: {str(e)}")
     with col_clear:
         if st.button("Clear History", type="secondary"):
             db_storage.clear_all_history()

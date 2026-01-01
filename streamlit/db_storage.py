@@ -52,8 +52,15 @@ def _get_supabase() -> Client:
 
 # ==================== SUPABASE IMPLEMENTATION ====================
 
+_last_db_error = None  # Store last error for UI display
+
+def get_last_db_error():
+    """Get the last database error for UI display"""
+    return _last_db_error
+
 def _supabase_save_analysis(result: Dict, params_hash: int = None):
     """Save analysis to Supabase"""
+    global _last_db_error
     if not result or 'ticker' not in result:
         return
 
@@ -76,9 +83,9 @@ def _supabase_save_analysis(result: Dict, params_hash: int = None):
             pass
 
         response = client.table('analysis_history').insert(data).execute()
-        print(f"Supabase save success: {ticker}, response: {response}")
+        _last_db_error = None  # Clear error on success
     except Exception as e:
-        print(f"Supabase save error for {result.get('ticker', 'unknown')}: {e}")
+        _last_db_error = f"Save error: {str(e)}"
         import traceback
         traceback.print_exc()
 
