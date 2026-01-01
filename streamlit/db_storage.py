@@ -548,10 +548,37 @@ def clear_old_checked_tickers(days: int = 30):
         _sqlite_clear_old_checked(days)
 
 
-# Initialize SQLite on import (for local development)
+# Initialize storage on import
 if not USE_SUPABASE:
     _sqlite_init_db()
     _sqlite_init_checked_tickers_table()
-    print("Using SQLite for local storage")
+    print("Storage: SQLite (local) - cache is NOT shared across environments")
 else:
-    print("Using Supabase for cloud storage")
+    print("Storage: Supabase (cloud) - cache IS shared across environments")
+
+
+def get_checked_tickers_count(filters: Dict = None) -> int:
+    """Get total count of checked tickers (for debugging)"""
+    if USE_SUPABASE:
+        try:
+            client = _get_supabase()
+            if filters:
+                filter_hash = _get_filter_hash(filters)
+                response = client.table('checked_tickers').select('ticker', count='exact').eq('filter_hash', filter_hash).execute()
+            else:
+                response = client.table('checked_tickers').select('ticker', count='exact').execute()
+            return response.count if response.count else 0
+        except Exception as e:
+            print(f"Supabase checked count error: {e}")
+            return 0
+    else:
+        conn = _sqlite_get_connection()
+        cursor = conn.cursor()
+        if filters:
+            filter_hash = _get_filter_hash(filters)
+            cursor.execute('SELECT COUNT(*) FROM checked_tickers WHERE filter_hash = ?', (filter_hash,))
+        else:
+            cursor.execute('SELECT COUNT(*) FROM checked_tickers')
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else 0

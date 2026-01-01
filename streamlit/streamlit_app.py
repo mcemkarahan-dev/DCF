@@ -898,6 +898,14 @@ with tab_batch:
 
     st.markdown("---")
 
+    # Storage status for cache
+    backend = db_storage.get_storage_backend()
+    total_checked = db_storage.get_checked_tickers_count(batch_filters)
+    if "SQLite" in backend:
+        st.warning(f"⚠️ Cache: {backend} - **NOT shared** across devices. Total cached: {total_checked}")
+    else:
+        st.caption(f"Cache: {backend} (shared) | Total cached for these filters: {total_checked}")
+
     # Run button
     col1, col2, col3 = st.columns([1, 1, 3])
 
