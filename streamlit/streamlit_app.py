@@ -1086,18 +1086,26 @@ with tab_history:
                     year_nums = []  # Numeric year for trendline calculation
 
                     for year, value in data:
-                        years.append(str(year))
+                        # Skip entries with invalid years
+                        if year is None or not isinstance(year, (int, float)):
+                            continue
+                        years.append(str(int(year)))
                         values.append(value)
                         types.append('Historical')
-                        year_nums.append(year)
+                        year_nums.append(int(year))
 
                     # Add projections if provided
-                    if show_projection and projections and last_year:
+                    if show_projection and projections and last_year and isinstance(last_year, (int, float)):
                         for i, proj_value in enumerate(projections):
-                            years.append(str(last_year + i + 1))
+                            proj_year = int(last_year) + i + 1
+                            years.append(str(proj_year))
                             values.append(proj_value)
                             types.append('Projected')
-                            year_nums.append(last_year + i + 1)
+                            year_nums.append(proj_year)
+
+                    # Return None if no valid data after filtering
+                    if not years:
+                        return None
 
                     chart_df = pd.DataFrame({
                         'Year': years,

@@ -405,11 +405,19 @@ class DCFCalculator:
                 historical_revenue.append(revenue)
 
         # ===== EXTRACT ADDITIONAL HISTORICAL SERIES FOR CHARTING =====
+        def parse_year(date_str):
+            """Safely parse year from date string"""
+            if not date_str or date_str == 'N/A':
+                return None
+            try:
+                return int(date_str[:4])
+            except (ValueError, TypeError):
+                return None
+
         # Revenue history with years
         revenue_history = []
         for inc in income_statements[:10]:
-            date = inc.get('date', 'N/A')
-            year = int(date[:4]) if date != 'N/A' else None
+            year = parse_year(inc.get('date'))
             revenue = inc.get('revenue', 0) or 0
             if year and revenue:
                 revenue_history.append((year, revenue))
@@ -417,8 +425,7 @@ class DCFCalculator:
         # Gross margin history (gross_profit / revenue * 100)
         gross_margin_history = []
         for inc in income_statements[:10]:
-            date = inc.get('date', 'N/A')
-            year = int(date[:4]) if date != 'N/A' else None
+            year = parse_year(inc.get('date'))
             revenue = inc.get('revenue', 0) or 0
             gross_profit = inc.get('grossProfit', 0) or 0
             if year and revenue > 0:
@@ -428,8 +435,7 @@ class DCFCalculator:
         # Debt history
         debt_history = []
         for bs in balance_sheets[:10]:
-            date = bs.get('date', 'N/A')
-            year = int(date[:4]) if date != 'N/A' else None
+            year = parse_year(bs.get('date'))
             total_debt = bs.get('totalDebt', 0) or 0
             if year:
                 debt_history.append((year, total_debt))
@@ -437,8 +443,7 @@ class DCFCalculator:
         # Capex history (keep as negative to show below x-axis)
         capex_history = []
         for cf in cash_flows[:10]:
-            date = cf.get('date', 'N/A')
-            year = int(date[:4]) if date != 'N/A' else None
+            year = parse_year(cf.get('date'))
             capex = cf.get('capitalExpenditure', 0) or 0
             if year:
                 # Keep capex as negative to display below x-axis
@@ -450,8 +455,7 @@ class DCFCalculator:
         shares_history = []
         key_metrics = financial_data.get('key_metrics', [])
         for metric in key_metrics[:10]:
-            date = metric.get('date', 'N/A')
-            year = int(date[:4]) if date != 'N/A' else None
+            year = parse_year(metric.get('date'))
             num_shares = metric.get('numberOfShares', 0) or 0
             if year and num_shares > 0:
                 shares_history.append((year, num_shares))
