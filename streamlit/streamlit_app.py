@@ -1084,8 +1084,14 @@ with tab_history:
 
                 st.markdown(f"### {selected_ticker} - Financial History")
 
+                # Modern, understated color palette
+                COLOR_HISTORICAL = '#64748b'      # Slate gray for historical bars
+                COLOR_PROJECTED = '#94a3b8'       # Lighter slate for projections
+                COLOR_TREND_HIST = '#1e293b'      # Dark slate for historical trendline
+                COLOR_TREND_PROJ = '#059669'      # Muted green for projection trendline
+
                 # Helper function to create compact charts with trendline
-                def create_mini_chart(data, value_col, title, color='#1a73e8', is_currency=True, is_percent=False, show_projection=False, projections=None, last_year=None):
+                def create_mini_chart(data, value_col, title, is_currency=True, is_percent=False, show_projection=False, projections=None, last_year=None):
                     if not data:
                         return None
 
@@ -1139,54 +1145,69 @@ with tab_history:
                             labelExpr="datum.value >= 1e9 ? format(datum.value/1e9, '.1f') + 'B' : datum.value >= 1e6 ? format(datum.value/1e6, '.1f') + 'M' : format(datum.value, ',.0f')"
                         )
 
-                    # Calculate trendline manually for historical data
+                    # Calculate trendline for historical data
                     hist_df = chart_df[chart_df['Type'] == 'Historical'].copy()
-                    trend_values = []
                     if len(hist_df) >= 2:
                         x_vals = hist_df['YearNum'].values
                         y_vals = hist_df[value_col].values
-                        # Simple linear regression
                         slope, intercept = np.polyfit(x_vals, y_vals, 1)
-                        for yn in hist_df['YearNum']:
-                            trend_values.append(intercept + slope * yn)
-                        hist_df = hist_df.copy()
-                        hist_df['Trend'] = trend_values
+                        hist_df['Trend'] = [intercept + slope * yn for yn in hist_df['YearNum']]
 
-                    # Bar chart
+                    # Calculate trendline for projected data (if applicable)
+                    proj_df = chart_df[chart_df['Type'] == 'Projected'].copy()
+                    if show_projection and len(proj_df) >= 2:
+                        x_vals_proj = proj_df['YearNum'].values
+                        y_vals_proj = proj_df[value_col].values
+                        slope_proj, intercept_proj = np.polyfit(x_vals_proj, y_vals_proj, 1)
+                        proj_df['TrendProj'] = [intercept_proj + slope_proj * yn for yn in proj_df['YearNum']]
+
+                    # Bar chart with uniform colors
                     if show_projection:
                         bars = alt.Chart(chart_df).mark_bar().encode(
                             x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9), title=None),
                             y=alt.Y(f'{value_col}:Q', axis=y_axis, title=None),
                             color=alt.Color('Type:N', scale=alt.Scale(
                                 domain=['Historical', 'Projected'],
-                                range=[color, '#fbbc04']
+                                range=[COLOR_HISTORICAL, COLOR_PROJECTED]
                             ), legend=None)
                         )
                     else:
-                        bars = alt.Chart(chart_df).mark_bar(color=color).encode(
+                        bars = alt.Chart(chart_df).mark_bar(color=COLOR_HISTORICAL).encode(
                             x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9), title=None),
                             y=alt.Y(f'{value_col}:Q', axis=y_axis, title=None)
                         )
 
-                    # Add trendline if we have enough data
+                    # Build chart with trendlines
+                    layers = [bars]
+
+                    # Historical trendline
                     if len(hist_df) >= 2 and 'Trend' in hist_df.columns:
-                        trendline = alt.Chart(hist_df).mark_line(
-                            color='#333333',
+                        trend_hist = alt.Chart(hist_df).mark_line(
+                            color=COLOR_TREND_HIST,
                             strokeDash=[4, 4],
                             strokeWidth=2
                         ).encode(
                             x=alt.X('Year:N', sort=None),
                             y=alt.Y('Trend:Q')
                         )
-                        chart = (bars + trendline).properties(
-                            height=200,
-                            title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold')
+                        layers.append(trend_hist)
+
+                    # Projection trendline (only for FCF chart with projections)
+                    if show_projection and len(proj_df) >= 2 and 'TrendProj' in proj_df.columns:
+                        trend_proj = alt.Chart(proj_df).mark_line(
+                            color=COLOR_TREND_PROJ,
+                            strokeDash=[2, 2],
+                            strokeWidth=2
+                        ).encode(
+                            x=alt.X('Year:N', sort=None),
+                            y=alt.Y('TrendProj:Q')
                         )
-                    else:
-                        chart = bars.properties(
-                            height=200,
-                            title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold')
-                        )
+                        layers.append(trend_proj)
+
+                    chart = alt.layer(*layers).properties(
+                        height=200,
+                        title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold')
+                    )
 
                     return chart
 
@@ -1213,7 +1234,7 @@ with tab_history:
                     with r1c1:
                         fcf_chart = create_mini_chart(
                             historical_data, input_label, f'{input_label} (w/ Proj)',
-                            color='#1a73e8', is_currency=True, show_projection=True,
+                            is_currency=True, show_projection=True,
                             projections=fcf_projections, last_year=last_year
                         )
                         if fcf_chart:
@@ -1222,7 +1243,7 @@ with tab_history:
                     with r1c2:
                         rev_chart = create_mini_chart(
                             revenue_history, 'Revenue', 'Revenue',
-                            color='#34a853', is_currency=True
+                            is_currency=True
                         )
                         if rev_chart:
                             st.altair_chart(rev_chart, use_container_width=True)
@@ -1234,7 +1255,7 @@ with tab_history:
                     with r2c1:
                         gm_chart = create_mini_chart(
                             gross_margin_history, 'Margin %', 'Gross Margin %',
-                            color='#673ab7', is_currency=False, is_percent=True
+                            is_currency=False, is_percent=True
                         )
                         if gm_chart:
                             st.altair_chart(gm_chart, use_container_width=True)
@@ -1244,7 +1265,7 @@ with tab_history:
                     with r2c2:
                         debt_chart = create_mini_chart(
                             debt_history, 'Debt', 'Total Debt',
-                            color='#ea4335', is_currency=True
+                            is_currency=True
                         )
                         if debt_chart:
                             st.altair_chart(debt_chart, use_container_width=True)
@@ -1256,7 +1277,7 @@ with tab_history:
                     with r3c1:
                         capex_chart = create_mini_chart(
                             capex_history, 'Capex', 'Capex',
-                            color='#ff9800', is_currency=True
+                            is_currency=True
                         )
                         if capex_chart:
                             st.altair_chart(capex_chart, use_container_width=True)
@@ -1266,7 +1287,7 @@ with tab_history:
                     with r3c2:
                         shares_chart = create_mini_chart(
                             shares_history, 'Shares', 'Shares Outstanding',
-                            color='#00bcd4', is_currency=False, is_percent=False
+                            is_currency=False, is_percent=False
                         )
                         if shares_chart:
                             st.altair_chart(shares_chart, use_container_width=True)
