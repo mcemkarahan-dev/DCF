@@ -587,3 +587,22 @@ def get_checked_tickers_count(filters: Dict = None) -> int:
         row = cursor.fetchone()
         conn.close()
         return row[0] if row else 0
+
+
+def clear_all_checked_tickers():
+    """Clear ALL checked tickers from cache (both local and cloud)"""
+    if USE_SUPABASE:
+        try:
+            client = _get_supabase()
+            # Delete all rows - Supabase requires a filter, use neq empty string
+            client.table('checked_tickers').delete().neq('ticker', '').execute()
+            print("Cleared all checked tickers from Supabase")
+        except Exception as e:
+            print(f"Supabase clear all checked error: {e}")
+    else:
+        conn = _sqlite_get_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM checked_tickers')
+        conn.commit()
+        conn.close()
+        print("Cleared all checked tickers from SQLite")

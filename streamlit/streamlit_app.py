@@ -906,14 +906,20 @@ with tab_batch:
     else:
         st.caption(f"Cache: {backend} (shared) | Total cached for these filters: {total_checked}")
 
-    # Run button
-    col1, col2, col3 = st.columns([1, 1, 3])
+    # Run button and controls
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
 
     with col1:
         run_batch = st.button("Run Batch Analysis", type="primary", use_container_width=True)
 
     with col2:
         stop_batch = st.button("Stop", use_container_width=True)
+
+    with col3:
+        if st.button("Clear Cache", type="secondary", use_container_width=True):
+            db_storage.clear_all_checked_tickers()
+            st.success("Cache cleared!")
+            st.rerun()
 
     # Batch execution
     if run_batch:
