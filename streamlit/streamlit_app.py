@@ -1115,9 +1115,17 @@ with tab_history:
             # Drop raw Market Cap column, keep formatted Mkt Cap
             display_df = filtered_df.drop(columns=['Market Cap'])
 
+            # Highlight selected row with understated light blue
+            def highlight_selected(row):
+                if row['Ticker'] == selected_ticker:
+                    return ['background-color: #e0f2fe'] * len(row)  # Light blue (sky-100)
+                return [''] * len(row)
+
+            styled_df = display_df.style.apply(highlight_selected, axis=1)
+
             # Display table with sorting enabled via column_config
             st.dataframe(
-                display_df,
+                styled_df,
                 hide_index=True,
                 use_container_width=True,
                 height=350,
