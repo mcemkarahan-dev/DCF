@@ -456,10 +456,12 @@ def was_recently_analyzed(ticker, params, days=10):
     return False, None
 
 # ==================== HEADER ====================
-# Logo SVG - two cartoon eyes with connecting curve (white background)
-header_html = """
-<div class="logo-header">
-    <svg class="logo-svg" viewBox="0 0 60 32" xmlns="http://www.w3.org/2000/svg">
+# Logo and branding using Streamlit columns
+logo_col, brand_col, spacer_col = st.columns([0.08, 0.4, 0.52])
+
+with logo_col:
+    # Display logo as inline SVG via markdown
+    st.markdown('''<svg viewBox="0 0 60 32" width="48" height="28" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 8 Q30 2 48 8" stroke="#3c4043" stroke-width="2.5" fill="none" stroke-linecap="round"/>
         <circle cx="14" cy="18" r="11" fill="white" stroke="#3c4043" stroke-width="2"/>
         <circle cx="14" cy="18" r="4" fill="#202124"/>
@@ -467,11 +469,10 @@ header_html = """
         <circle cx="46" cy="18" r="11" fill="white" stroke="#3c4043" stroke-width="2"/>
         <circle cx="46" cy="18" r="4" fill="#202124"/>
         <circle cx="44" cy="16" r="1.5" fill="white"/>
-    </svg>
-    <span class="main-header">DCF Stock Analyzer</span>
-</div>
-"""
-st.markdown(header_html, unsafe_allow_html=True)
+    </svg>''', unsafe_allow_html=True)
+
+with brand_col:
+    st.markdown("**Cem's DCF Screener**")
 
 # ==================== MAIN TABS (Google Flights Style) ====================
 tab_analyze, tab_batch, tab_history, tab_settings = st.tabs([
