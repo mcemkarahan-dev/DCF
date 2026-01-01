@@ -21,6 +21,7 @@ from batch_screener import (
     get_filters_by_category, get_all_sectors, get_all_exchanges,
     get_all_market_cap_universes
 )
+import db_storage  # Persistent database storage
 
 # Page configuration
 st.set_page_config(
@@ -311,7 +312,8 @@ if 'api_key' not in st.session_state:
 if 'analysis_result' not in st.session_state:
     st.session_state.analysis_result = None
 if 'analysis_history' not in st.session_state:
-    st.session_state.analysis_history = []
+    # Load from persistent database on first run
+    st.session_state.analysis_history = db_storage.load_all_history(limit=100)
 if 'batch_running' not in st.session_state:
     st.session_state.batch_running = False
 
@@ -323,12 +325,18 @@ if 'filter_exchanges' not in st.session_state:
 if 'filter_market_caps' not in st.session_state:
     st.session_state.filter_market_caps = []
 
-# Try to load API key from Streamlit secrets
+# Default ROIC API key (hardcoded for single-user convenience)
+DEFAULT_ROIC_API_KEY = "1e702063f1534ee1b0485da8f461bda9"
+
 def get_saved_api_key():
+    """Get API key - first try secrets, then use default"""
     try:
-        return st.secrets.get("ROIC_API_KEY", "")
+        key = st.secrets.get("ROIC_API_KEY", "")
+        if key:
+            return key
     except:
-        return ""
+        pass
+    return DEFAULT_ROIC_API_KEY
 
 if not st.session_state.api_key:
     st.session_state.api_key = get_saved_api_key()
@@ -387,16 +395,21 @@ def add_to_history(result, params=None):
 
     # Add run metadata
     result['run_date'] = datetime.now().isoformat()
+    params_hash = None
     if params:
-        result['params_hash'] = get_params_hash(params)
+        params_hash = get_params_hash(params)
+        result['params_hash'] = params_hash
 
-    # Remove previous entry for same ticker
+    # Remove previous entry for same ticker (in session)
     st.session_state.analysis_history = [
         r for r in st.session_state.analysis_history
         if r['ticker'] != result['ticker']
     ]
     st.session_state.analysis_history.insert(0, result)
     st.session_state.analysis_history = st.session_state.analysis_history[:100]
+
+    # Persist to database
+    db_storage.save_analysis(result, params_hash)
 
 def was_recently_analyzed(ticker, params, days=10):
     """Check if ticker was analyzed with same params within last N days"""
@@ -781,7 +794,7 @@ with tab_batch:
 
     # Advanced filters
     with st.expander("Advanced Filters ▾"):
-        adv_cols = st.columns(4)
+        adv_cols = st.columns(5)
 
         with adv_cols[0]:
             fcf_last_year = st.selectbox(
@@ -792,15 +805,23 @@ with tab_batch:
 
         with adv_cols[1]:
             fcf_years_3 = st.number_input(
-                "Min FCF Years (3yr)", min_value=0, max_value=3, value=0
+                "Min +FCF Years (3yr)", min_value=0, max_value=3, value=0,
+                help="Min years with positive FCF in last 3 years"
             )
 
         with adv_cols[2]:
             fcf_years_5 = st.number_input(
-                "Min FCF Years (5yr)", min_value=0, max_value=5, value=0
+                "Min +FCF Years (5yr)", min_value=0, max_value=5, value=0,
+                help="Min years with positive FCF in last 5 years"
             )
 
         with adv_cols[3]:
+            fcf_years_10 = st.number_input(
+                "Min +FCF Years (10yr)", min_value=0, max_value=10, value=0,
+                help="Min years with positive FCF in last 10 years"
+            )
+
+        with adv_cols[4]:
             min_gross_margin = st.number_input(
                 "Min Gross Margin %", min_value=0.0, max_value=100.0, value=0.0, step=5.0
             )
@@ -813,6 +834,7 @@ with tab_batch:
         'positive_fcf_last_year': fcf_last_year,
         'positive_fcf_years_3': fcf_years_3,
         'positive_fcf_years_5': fcf_years_5,
+        'positive_fcf_years_10': fcf_years_10,
         'min_gross_margin': min_gross_margin,
     }
 
