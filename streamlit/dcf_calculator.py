@@ -403,6 +403,56 @@ class DCFCalculator:
             revenue = inc.get('revenue')
             if revenue and revenue != 0:
                 historical_revenue.append(revenue)
+
+        # ===== EXTRACT ADDITIONAL HISTORICAL SERIES FOR CHARTING =====
+        # Revenue history with years
+        revenue_history = []
+        for inc in income_statements[:10]:
+            date = inc.get('date', 'N/A')
+            year = int(date[:4]) if date != 'N/A' else None
+            revenue = inc.get('revenue', 0) or 0
+            if year and revenue:
+                revenue_history.append((year, revenue))
+
+        # Gross margin history (gross_profit / revenue * 100)
+        gross_margin_history = []
+        for inc in income_statements[:10]:
+            date = inc.get('date', 'N/A')
+            year = int(date[:4]) if date != 'N/A' else None
+            revenue = inc.get('revenue', 0) or 0
+            gross_profit = inc.get('grossProfit', 0) or 0
+            if year and revenue > 0:
+                margin = (gross_profit / revenue) * 100
+                gross_margin_history.append((year, margin))
+
+        # Debt history
+        debt_history = []
+        for bs in balance_sheets[:10]:
+            date = bs.get('date', 'N/A')
+            year = int(date[:4]) if date != 'N/A' else None
+            total_debt = bs.get('totalDebt', 0) or 0
+            if year:
+                debt_history.append((year, total_debt))
+
+        # Capex history (make positive for display)
+        capex_history = []
+        for cf in cash_flows[:10]:
+            date = cf.get('date', 'N/A')
+            year = int(date[:4]) if date != 'N/A' else None
+            capex = cf.get('capitalExpenditure', 0) or 0
+            if year:
+                # Capex is usually negative, make it positive for display
+                capex_history.append((year, abs(capex)))
+
+        # Shares outstanding history
+        shares_history = []
+        key_metrics = financial_data.get('key_metrics', [])
+        for metric in key_metrics[:10]:
+            date = metric.get('date', 'N/A')
+            year = int(date[:4]) if date != 'N/A' else None
+            num_shares = metric.get('numberOfShares', 0) or 0
+            if year and num_shares > 0:
+                shares_history.append((year, num_shares))
         
         # Run DCF calculation using user-specified growth rate
         # Calculate historical growth rate for informational purposes (5-year or available)
@@ -428,6 +478,12 @@ class DCFCalculator:
             dcf_result['is_per_share'] = (input_type in ['eps_cont_ops', 'fcf'])  # Both are per-share now
             # Add historical data for charting (sorted oldest to newest)
             dcf_result['historical_data'] = sorted(historical_data, key=lambda x: x[0])
+            # Add additional historical series for charting
+            dcf_result['revenue_history'] = sorted(revenue_history, key=lambda x: x[0])
+            dcf_result['gross_margin_history'] = sorted(gross_margin_history, key=lambda x: x[0])
+            dcf_result['debt_history'] = sorted(debt_history, key=lambda x: x[0])
+            dcf_result['capex_history'] = sorted(capex_history, key=lambda x: x[0])
+            dcf_result['shares_history'] = sorted(shares_history, key=lambda x: x[0])
         
         if not dcf_result:
             return None

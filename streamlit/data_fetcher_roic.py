@@ -123,10 +123,18 @@ class RoicDataFetcher:
                 item.get('diluted_eps') or
                 item.get('eps')
             )
-            
+
+            # Gross profit for margin calculation
+            gross_profit = to_float(
+                item.get('is_gross_profit') or
+                item.get('grossProfit') or
+                item.get('is_gross_inc')
+            )
+
             results.append({
                 'date': item.get('date'),
                 'revenue': revenue,
+                'grossProfit': gross_profit,
                 'operatingIncome': operating_income,
                 'netIncome': net_income,
                 'eps_cont_ops': eps_cont_ops,

@@ -1045,49 +1045,131 @@ with tab_history:
             selected_result = next((r for r in st.session_state.analysis_history if r['ticker'] == selected_ticker), None)
 
             if selected_result:
+                import altair as alt
                 dcf_selected = selected_result.get('dcf_result', {})
                 input_type_sel = dcf_selected.get('input_type', 'fcf')
                 input_label = "EPS" if input_type_sel == 'eps_cont_ops' else "FCF/Share"
 
+                st.markdown(f"### {selected_ticker} - Financial History")
+
+                # Helper function to create compact charts
+                def create_mini_chart(data, value_col, title, color='#1a73e8', format_type='currency', show_projection=False, projections=None, last_year=None):
+                    if not data:
+                        return None
+
+                    years = []
+                    values = []
+                    types = []
+
+                    for year, value in data:
+                        years.append(str(year))
+                        values.append(value)
+                        types.append('Historical')
+
+                    # Add projections if provided
+                    if show_projection and projections and last_year:
+                        for i, proj_value in enumerate(projections):
+                            years.append(str(last_year + i + 1))
+                            values.append(proj_value)
+                            types.append('Projected')
+
+                    chart_df = pd.DataFrame({'Year': years, value_col: values, 'Type': types})
+
+                    if show_projection:
+                        chart = alt.Chart(chart_df).mark_bar().encode(
+                            x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9)),
+                            y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=9)),
+                            color=alt.Color('Type:N', scale=alt.Scale(
+                                domain=['Historical', 'Projected'],
+                                range=[color, '#fbbc04']
+                            ), legend=None)
+                        ).properties(height=150, title=alt.TitleParams(text=title, fontSize=12))
+                    else:
+                        chart = alt.Chart(chart_df).mark_bar(color=color).encode(
+                            x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9)),
+                            y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=9))
+                        ).properties(height=150, title=alt.TitleParams(text=title, fontSize=12))
+
+                    return chart
+
+                # Get data from dcf_result
                 historical_data = dcf_selected.get('historical_data', [])
                 fcf_projections = dcf_selected.get('fcf_projections', [])
+                revenue_history = dcf_selected.get('revenue_history', [])
+                gross_margin_history = dcf_selected.get('gross_margin_history', [])
+                debt_history = dcf_selected.get('debt_history', [])
+                capex_history = dcf_selected.get('capex_history', [])
+                shares_history = dcf_selected.get('shares_history', [])
 
                 if historical_data:
                     last_year = max(h[0] for h in historical_data)
                 else:
                     last_year = datetime.now().year - 1
 
-                years = []
-                values = []
-                types = []
+                # Create 2x3 grid of charts
+                row1_col1, row1_col2, row1_col3 = st.columns(3)
+                row2_col1, row2_col2, row2_col3 = st.columns(3)
 
-                for year, value in sorted(historical_data, key=lambda x: x[0]):
-                    years.append(str(year))
-                    values.append(value)
-                    types.append('Historical')
+                # Row 1: FCF (with projections), Revenue, Gross Margin
+                with row1_col1:
+                    fcf_chart = create_mini_chart(
+                        historical_data, input_label, f'{input_label} (w/ Proj)',
+                        color='#1a73e8', show_projection=True,
+                        projections=fcf_projections, last_year=last_year
+                    )
+                    if fcf_chart:
+                        st.altair_chart(fcf_chart, use_container_width=True)
 
-                for i, proj_value in enumerate(fcf_projections):
-                    years.append(str(last_year + i + 1))
-                    values.append(proj_value)
-                    types.append('Projected')
+                with row1_col2:
+                    rev_chart = create_mini_chart(
+                        revenue_history, 'Revenue', 'Revenue',
+                        color='#34a853'
+                    )
+                    if rev_chart:
+                        st.altair_chart(rev_chart, use_container_width=True)
+                    elif not revenue_history:
+                        st.caption("Revenue: No data")
 
-                if years:
-                    st.markdown(f"### {selected_ticker} - {input_label} by Year")
+                with row1_col3:
+                    gm_chart = create_mini_chart(
+                        gross_margin_history, 'Margin %', 'Gross Margin %',
+                        color='#673ab7'
+                    )
+                    if gm_chart:
+                        st.altair_chart(gm_chart, use_container_width=True)
+                    elif not gross_margin_history:
+                        st.caption("Gross Margin: No data")
 
-                    # Chart
-                    import altair as alt
-                    chart_df = pd.DataFrame({'Year': years, input_label: values, 'Type': types})
+                # Row 2: Debt, Capex, Shares Outstanding
+                with row2_col1:
+                    debt_chart = create_mini_chart(
+                        debt_history, 'Debt', 'Total Debt',
+                        color='#ea4335'
+                    )
+                    if debt_chart:
+                        st.altair_chart(debt_chart, use_container_width=True)
+                    elif not debt_history:
+                        st.caption("Debt: No data")
 
-                    chart = alt.Chart(chart_df).mark_bar().encode(
-                        x=alt.X('Year:N', sort=None),
-                        y=alt.Y(f'{input_label}:Q'),
-                        color=alt.Color('Type:N', scale=alt.Scale(
-                            domain=['Historical', 'Projected'],
-                            range=['#1a73e8', '#fbbc04']
-                        ))
-                    ).properties(height=300)
+                with row2_col2:
+                    capex_chart = create_mini_chart(
+                        capex_history, 'Capex', 'Capex',
+                        color='#ff9800'
+                    )
+                    if capex_chart:
+                        st.altair_chart(capex_chart, use_container_width=True)
+                    elif not capex_history:
+                        st.caption("Capex: No data")
 
-                    st.altair_chart(chart, use_container_width=True)
+                with row2_col3:
+                    shares_chart = create_mini_chart(
+                        shares_history, 'Shares', 'Shares Outstanding',
+                        color='#00bcd4'
+                    )
+                    if shares_chart:
+                        st.altair_chart(shares_chart, use_container_width=True)
+                    elif not shares_history:
+                        st.caption("Shares: No data")
 
 # Footer
 st.markdown("---")
