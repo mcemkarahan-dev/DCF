@@ -6,7 +6,7 @@ Uses Supabase (cloud) when configured, falls back to SQLite (local)
 import json
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 
 # Try to import Supabase
@@ -340,9 +340,194 @@ def get_storage_backend() -> str:
     return "Supabase" if USE_SUPABASE else "SQLite (local)"
 
 
+# ==================== CHECKED TICKERS TRACKING ====================
+# Track which tickers have been checked (even non-matches) to avoid re-checking
+
+def _get_filter_hash(filters: Dict) -> int:
+    """Create a hash of filter parameters"""
+    if not filters:
+        return 0
+    # Sort keys for consistent hashing
+    filter_str = json.dumps(filters, sort_keys=True)
+    return hash(filter_str)
+
+
+# Supabase implementation for checked tickers
+def _supabase_save_checked_ticker(ticker: str, filter_hash: int, matched: bool):
+    """Save a checked ticker to Supabase"""
+    try:
+        client = _get_supabase()
+        data = {
+            'ticker': ticker,
+            'filter_hash': filter_hash,
+            'matched': matched,
+            'checked_at': datetime.now().isoformat(),
+        }
+        client.table('checked_tickers').upsert(
+            data, on_conflict='ticker,filter_hash'
+        ).execute()
+    except Exception as e:
+        print(f"Supabase save checked ticker error: {e}")
+
+
+def _supabase_was_recently_checked(ticker: str, filter_hash: int, days: int = 7) -> bool:
+    """Check if ticker was checked with same filters in last N days"""
+    try:
+        client = _get_supabase()
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+
+        response = client.table('checked_tickers') \
+            .select('checked_at') \
+            .eq('ticker', ticker) \
+            .eq('filter_hash', filter_hash) \
+            .gte('checked_at', cutoff) \
+            .execute()
+
+        return len(response.data) > 0
+    except Exception as e:
+        print(f"Supabase check recently checked error: {e}")
+        return False
+
+
+def _supabase_get_recently_checked_tickers(filter_hash: int, days: int = 7) -> set:
+    """Get all tickers checked with same filters in last N days"""
+    try:
+        client = _get_supabase()
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+
+        response = client.table('checked_tickers') \
+            .select('ticker') \
+            .eq('filter_hash', filter_hash) \
+            .gte('checked_at', cutoff) \
+            .execute()
+
+        return set(row['ticker'] for row in response.data)
+    except Exception as e:
+        print(f"Supabase get recently checked error: {e}")
+        return set()
+
+
+def _supabase_clear_old_checked(days: int = 30):
+    """Clear checked tickers older than N days"""
+    try:
+        client = _get_supabase()
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+        client.table('checked_tickers').delete().lt('checked_at', cutoff).execute()
+    except Exception as e:
+        print(f"Supabase clear old checked error: {e}")
+
+
+# SQLite implementation for checked tickers
+def _sqlite_init_checked_tickers_table():
+    """Initialize checked_tickers table in SQLite"""
+    conn = _sqlite_get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS checked_tickers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            filter_hash INTEGER NOT NULL,
+            matched INTEGER DEFAULT 0,
+            checked_at TEXT NOT NULL,
+            UNIQUE(ticker, filter_hash)
+        )
+    ''')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_checked_filter ON checked_tickers(filter_hash)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_checked_at ON checked_tickers(checked_at)')
+    conn.commit()
+    conn.close()
+
+
+def _sqlite_save_checked_ticker(ticker: str, filter_hash: int, matched: bool):
+    """Save a checked ticker to SQLite"""
+    conn = _sqlite_get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT OR REPLACE INTO checked_tickers (ticker, filter_hash, matched, checked_at)
+        VALUES (?, ?, ?, ?)
+    ''', (ticker, filter_hash, 1 if matched else 0, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+
+def _sqlite_was_recently_checked(ticker: str, filter_hash: int, days: int = 7) -> bool:
+    """Check if ticker was checked with same filters in last N days"""
+    conn = _sqlite_get_connection()
+    cursor = conn.cursor()
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    cursor.execute('''
+        SELECT 1 FROM checked_tickers
+        WHERE ticker = ? AND filter_hash = ? AND checked_at >= ?
+    ''', (ticker, filter_hash, cutoff))
+    row = cursor.fetchone()
+    conn.close()
+    return row is not None
+
+
+def _sqlite_get_recently_checked_tickers(filter_hash: int, days: int = 7) -> set:
+    """Get all tickers checked with same filters in last N days"""
+    conn = _sqlite_get_connection()
+    cursor = conn.cursor()
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    cursor.execute('''
+        SELECT ticker FROM checked_tickers
+        WHERE filter_hash = ? AND checked_at >= ?
+    ''', (filter_hash, cutoff))
+    rows = cursor.fetchall()
+    conn.close()
+    return set(row[0] for row in rows)
+
+
+def _sqlite_clear_old_checked(days: int = 30):
+    """Clear checked tickers older than N days"""
+    conn = _sqlite_get_connection()
+    cursor = conn.cursor()
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    cursor.execute('DELETE FROM checked_tickers WHERE checked_at < ?', (cutoff,))
+    conn.commit()
+    conn.close()
+
+
+# Public API for checked tickers
+def save_checked_ticker(ticker: str, filters: Dict, matched: bool):
+    """Save that a ticker was checked with given filters"""
+    filter_hash = _get_filter_hash(filters)
+    if USE_SUPABASE:
+        _supabase_save_checked_ticker(ticker, filter_hash, matched)
+    else:
+        _sqlite_save_checked_ticker(ticker, filter_hash, matched)
+
+
+def was_recently_checked(ticker: str, filters: Dict, days: int = 7) -> bool:
+    """Check if ticker was checked with same filters in last N days"""
+    filter_hash = _get_filter_hash(filters)
+    if USE_SUPABASE:
+        return _supabase_was_recently_checked(ticker, filter_hash, days)
+    else:
+        return _sqlite_was_recently_checked(ticker, filter_hash, days)
+
+
+def get_recently_checked_tickers(filters: Dict, days: int = 7) -> set:
+    """Get all tickers checked with same filters in last N days"""
+    filter_hash = _get_filter_hash(filters)
+    if USE_SUPABASE:
+        return _supabase_get_recently_checked_tickers(filter_hash, days)
+    else:
+        return _sqlite_get_recently_checked_tickers(filter_hash, days)
+
+
+def clear_old_checked_tickers(days: int = 30):
+    """Clear checked tickers older than N days"""
+    if USE_SUPABASE:
+        _supabase_clear_old_checked(days)
+    else:
+        _sqlite_clear_old_checked(days)
+
+
 # Initialize SQLite on import (for local development)
 if not USE_SUPABASE:
     _sqlite_init_db()
+    _sqlite_init_checked_tickers_table()
     print("Using SQLite for local storage")
 else:
     print("Using Supabase for cloud storage")

@@ -854,6 +854,8 @@ class BatchScreener:
     def screen_stocks_streaming(self, filters: Dict,
                                 progress_callback: Callable = None,
                                 match_callback: Callable = None,
+                                checked_callback: Callable = None,
+                                exclude_tickers: set = None,
                                 max_stocks: int = None) -> Generator[Dict, None, None]:
         """
         Screen stocks with streaming results.
@@ -863,6 +865,8 @@ class BatchScreener:
             filters: Dict of filter values
             progress_callback: Function(current, total, message, is_filtering) for progress updates
             match_callback: Function(stock) called when a stock matches
+            checked_callback: Function(ticker, matched) called after each ticker is checked
+            exclude_tickers: Set of tickers to skip (e.g., recently checked)
             max_stocks: Maximum number of stocks to return
 
         Yields:
@@ -873,6 +877,14 @@ class BatchScreener:
             progress_callback(0, 100, "Fetching stock universe...", True)
 
         stocks = self.get_stock_universe()
+
+        # Filter out excluded tickers upfront for efficiency
+        if exclude_tickers:
+            original_count = len(stocks)
+            stocks = [s for s in stocks if s['ticker'] not in exclude_tickers]
+            skipped = original_count - len(stocks)
+            if skipped > 0:
+                print(f"Skipped {skipped} recently checked tickers")
 
         # print(f"DEBUG: Got {len(stocks)} stocks in universe")
 
@@ -909,6 +921,10 @@ class BatchScreener:
                 #     print(f"DEBUG: {stock['ticker']} failed basic filters")
                 continue
 
+            # Track if this ticker required slow operations (enrichment/financial)
+            required_slow_check = need_enrichment or need_financial
+            passed_all = True
+
             # Step 2: Enrichment if needed (market cap universe, sector, gross margin)
             if need_enrichment:
                 stock = self.enrich_stock_info(stock)
@@ -919,23 +935,32 @@ class BatchScreener:
                 if sector_filter and len(sector_filter) > 0:
                     stock_sector = stock.get('sector', 'N/A')
                     if stock_sector != 'N/A' and stock_sector not in sector_filter:
-                        continue
+                        passed_all = False
 
                 # Re-check market cap filter after enrichment
-                market_cap_filter = filters.get('market_cap_universe', [])
-                if market_cap_filter and len(market_cap_filter) > 0:
-                    if stock.get('market_cap_universe', 'Unknown') not in market_cap_filter:
-                        continue
+                if passed_all:
+                    market_cap_filter = filters.get('market_cap_universe', [])
+                    if market_cap_filter and len(market_cap_filter) > 0:
+                        if stock.get('market_cap_universe', 'Unknown') not in market_cap_filter:
+                            passed_all = False
 
             # Step 3: Financial filters if needed
-            if need_financial:
+            if passed_all and need_financial:
                 metrics = self.get_financial_metrics(stock['ticker'])
                 time.sleep(0.2)  # Rate limiting
 
                 if not self.passes_financial_filters(stock, metrics, filters):
-                    continue
+                    passed_all = False
+                else:
+                    stock['metrics'] = metrics
 
-                stock['metrics'] = metrics
+            # Record that this ticker was checked (if it required slow operations)
+            if required_slow_check and checked_callback:
+                checked_callback(stock['ticker'], passed_all)
+
+            # Skip if didn't pass all filters
+            if not passed_all:
+                continue
 
             # Stock passed all filters!
             matched_count += 1

@@ -878,9 +878,15 @@ with tab_batch:
             checked_count = [0]  # Use list to allow mutation in nested function
             total_count = [0]  # Track total for display
             skipped_in_history = [0]  # Track skipped due to being in history
+            skipped_recently_checked = [0]  # Track skipped due to recent check
 
             # Get set of tickers already in history to skip
             existing_tickers = set(r['ticker'] for r in st.session_state.analysis_history)
+
+            # Get tickers recently checked with same filters (last 7 days)
+            recently_checked = db_storage.get_recently_checked_tickers(batch_filters, days=7)
+            if recently_checked:
+                skipped_recently_checked[0] = len(recently_checked)
 
             try:
                 source = "roic" if "Roic" in data_source else "yahoo"
@@ -896,8 +902,11 @@ with tab_batch:
                         checked_count[0] = current
                         total_count[0] = total
                         match_pct = (len(matched_tickers) / current * 100) if current > 0 else 0
+                        skip_text = ""
+                        if skipped_recently_checked[0] > 0:
+                            skip_text = f" | **Cached:** {skipped_recently_checked[0]}"
                         stats_display.markdown(
-                            f"**Checked:** {current:,} / {total:,} | **Matched:** {len(matched_tickers)} | **Match Rate:** {match_pct:.1f}%"
+                            f"**Checked:** {current:,} / {total:,} | **Matched:** {len(matched_tickers)}{skip_text} | **Match Rate:** {match_pct:.1f}%"
                         )
 
                 def on_match(stock):
@@ -909,11 +918,19 @@ with tab_batch:
 
                     matched_tickers.append(ticker)
                     match_pct = (len(matched_tickers) / checked_count[0] * 100) if checked_count[0] > 0 else 0
-                    skip_text = f" | **Skipped:** {skipped_in_history[0]}" if skipped_in_history[0] > 0 else ""
+                    skip_text = ""
+                    if skipped_in_history[0] > 0:
+                        skip_text += f" | **In History:** {skipped_in_history[0]}"
+                    if skipped_recently_checked[0] > 0:
+                        skip_text += f" | **Cached:** {skipped_recently_checked[0]}"
                     stats_display.markdown(
                         f"**Checked:** {checked_count[0]:,} / {total_count[0]:,} | **Matched:** {len(matched_tickers)}{skip_text} | **Match Rate:** {match_pct:.1f}%"
                     )
                     matched_display.success(f"**Matched Tickers:** {', '.join(matched_tickers)}")
+
+                def on_checked(ticker: str, matched: bool):
+                    """Save each checked ticker to avoid re-checking"""
+                    db_storage.save_checked_ticker(ticker, batch_filters, matched)
 
                 # Screen stocks
                 status_text.text("Screening stocks...")
@@ -921,6 +938,8 @@ with tab_batch:
                     filters=batch_filters,
                     progress_callback=update_progress,
                     match_callback=on_match,
+                    checked_callback=on_checked,
+                    exclude_tickers=recently_checked,
                     max_stocks=max_stocks + len(existing_tickers)  # Request extra to account for skips
                 ))
 
