@@ -995,12 +995,32 @@ with tab_batch:
 
 # ==================== TAB: ANALYSIS HISTORY ====================
 with tab_history:
-    # Storage status and clear button
-    col_status, col_clear, col_spacer = st.columns([2, 1, 3])
+    # Storage status and buttons
+    col_status, col_test, col_clear, col_spacer = st.columns([2, 1, 1, 2])
     with col_status:
         backend = db_storage.get_storage_backend()
         history_count = len(st.session_state.analysis_history)
         st.caption(f"Storage: {backend} | Items: {history_count}")
+    with col_test:
+        if st.button("Test DB", type="secondary"):
+            # Test write and read
+            test_result = {
+                'ticker': 'TEST',
+                'company_name': 'Test Company',
+                'run_date': datetime.now().isoformat(),
+                'intrinsic_value': 100.0,
+                'current_price': 50.0,
+                'discount_pct': 50.0,
+            }
+            db_storage.save_analysis(test_result)
+            # Try to read it back
+            loaded = db_storage.get_analysis('TEST')
+            if loaded:
+                st.success(f"DB works! Saved and loaded TEST ticker.")
+                # Clean up
+                db_storage.delete_analysis('TEST')
+            else:
+                st.error("DB test failed - could not read back saved data.")
     with col_clear:
         if st.button("Clear History", type="secondary"):
             db_storage.clear_all_history()
