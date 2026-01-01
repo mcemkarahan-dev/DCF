@@ -233,71 +233,114 @@ class BatchScreener:
 
     def _get_yahoo_universe(self, exchange: str = None) -> List[Dict]:
         """
-        Get stock universe using S&P 500 from Wikipedia.
-        Already includes sector information from GICS.
+        Get stock universe - uses a reliable built-in list of major stocks.
         """
+        # Use a hardcoded list of major S&P 500 stocks - more reliable than web scraping
+        SP500_STOCKS = [
+            ('AAPL', 'Apple Inc.', 'Technology'),
+            ('MSFT', 'Microsoft Corp.', 'Technology'),
+            ('GOOGL', 'Alphabet Inc.', 'Communication Services'),
+            ('AMZN', 'Amazon.com Inc.', 'Consumer Cyclical'),
+            ('NVDA', 'NVIDIA Corp.', 'Technology'),
+            ('META', 'Meta Platforms Inc.', 'Communication Services'),
+            ('TSLA', 'Tesla Inc.', 'Consumer Cyclical'),
+            ('BRK-B', 'Berkshire Hathaway', 'Financial Services'),
+            ('UNH', 'UnitedHealth Group', 'Healthcare'),
+            ('JNJ', 'Johnson & Johnson', 'Healthcare'),
+            ('JPM', 'JPMorgan Chase', 'Financial Services'),
+            ('V', 'Visa Inc.', 'Financial Services'),
+            ('XOM', 'Exxon Mobil', 'Energy'),
+            ('PG', 'Procter & Gamble', 'Consumer Defensive'),
+            ('MA', 'Mastercard', 'Financial Services'),
+            ('HD', 'Home Depot', 'Consumer Cyclical'),
+            ('CVX', 'Chevron', 'Energy'),
+            ('MRK', 'Merck & Co.', 'Healthcare'),
+            ('LLY', 'Eli Lilly', 'Healthcare'),
+            ('ABBV', 'AbbVie Inc.', 'Healthcare'),
+            ('PEP', 'PepsiCo', 'Consumer Defensive'),
+            ('KO', 'Coca-Cola', 'Consumer Defensive'),
+            ('AVGO', 'Broadcom Inc.', 'Technology'),
+            ('COST', 'Costco', 'Consumer Defensive'),
+            ('MCD', 'McDonald\'s', 'Consumer Cyclical'),
+            ('WMT', 'Walmart', 'Consumer Defensive'),
+            ('CSCO', 'Cisco Systems', 'Technology'),
+            ('TMO', 'Thermo Fisher', 'Healthcare'),
+            ('ACN', 'Accenture', 'Technology'),
+            ('ABT', 'Abbott Labs', 'Healthcare'),
+            ('CRM', 'Salesforce', 'Technology'),
+            ('DHR', 'Danaher', 'Healthcare'),
+            ('ORCL', 'Oracle', 'Technology'),
+            ('NKE', 'Nike Inc.', 'Consumer Cyclical'),
+            ('AMD', 'AMD', 'Technology'),
+            ('INTC', 'Intel', 'Technology'),
+            ('DIS', 'Walt Disney', 'Communication Services'),
+            ('VZ', 'Verizon', 'Communication Services'),
+            ('NFLX', 'Netflix', 'Communication Services'),
+            ('ADBE', 'Adobe Inc.', 'Technology'),
+            ('TXN', 'Texas Instruments', 'Technology'),
+            ('PM', 'Philip Morris', 'Consumer Defensive'),
+            ('NEE', 'NextEra Energy', 'Utilities'),
+            ('UNP', 'Union Pacific', 'Industrials'),
+            ('RTX', 'Raytheon', 'Industrials'),
+            ('HON', 'Honeywell', 'Industrials'),
+            ('QCOM', 'Qualcomm', 'Technology'),
+            ('LOW', 'Lowe\'s', 'Consumer Cyclical'),
+            ('BA', 'Boeing', 'Industrials'),
+            ('CAT', 'Caterpillar', 'Industrials'),
+            ('GS', 'Goldman Sachs', 'Financial Services'),
+            ('MS', 'Morgan Stanley', 'Financial Services'),
+            ('BLK', 'BlackRock', 'Financial Services'),
+            ('SPGI', 'S&P Global', 'Financial Services'),
+            ('AXP', 'American Express', 'Financial Services'),
+            ('IBM', 'IBM', 'Technology'),
+            ('GE', 'General Electric', 'Industrials'),
+            ('AMGN', 'Amgen', 'Healthcare'),
+            ('GILD', 'Gilead Sciences', 'Healthcare'),
+            ('MDLZ', 'Mondelez', 'Consumer Defensive'),
+            ('DE', 'Deere & Co.', 'Industrials'),
+            ('LMT', 'Lockheed Martin', 'Industrials'),
+            ('NOW', 'ServiceNow', 'Technology'),
+            ('ISRG', 'Intuitive Surgical', 'Healthcare'),
+            ('BKNG', 'Booking Holdings', 'Consumer Cyclical'),
+            ('ADI', 'Analog Devices', 'Technology'),
+            ('SBUX', 'Starbucks', 'Consumer Cyclical'),
+            ('MMC', 'Marsh McLennan', 'Financial Services'),
+            ('VRTX', 'Vertex Pharma', 'Healthcare'),
+            ('REGN', 'Regeneron', 'Healthcare'),
+            ('ZTS', 'Zoetis', 'Healthcare'),
+            ('PLD', 'Prologis', 'Real Estate'),
+            ('AMT', 'American Tower', 'Real Estate'),
+            ('SYK', 'Stryker', 'Healthcare'),
+            ('SCHW', 'Charles Schwab', 'Financial Services'),
+            ('ADP', 'ADP', 'Industrials'),
+            ('LRCX', 'Lam Research', 'Technology'),
+            ('CB', 'Chubb Limited', 'Financial Services'),
+            ('MMM', '3M Company', 'Industrials'),
+            ('SO', 'Southern Company', 'Utilities'),
+            ('DUK', 'Duke Energy', 'Utilities'),
+            ('CL', 'Colgate-Palmolive', 'Consumer Defensive'),
+            ('EOG', 'EOG Resources', 'Energy'),
+            ('SLB', 'Schlumberger', 'Energy'),
+            ('PXD', 'Pioneer Natural', 'Energy'),
+            ('FCX', 'Freeport-McMoRan', 'Basic Materials'),
+            ('NEM', 'Newmont', 'Basic Materials'),
+            ('APD', 'Air Products', 'Basic Materials'),
+            ('SHW', 'Sherwin-Williams', 'Basic Materials'),
+            ('ECL', 'Ecolab', 'Basic Materials'),
+        ]
+
         stocks = []
+        for ticker, name, sector in SP500_STOCKS:
+            stocks.append({
+                'ticker': ticker,
+                'name': name,
+                'sector': sector,
+                'exchange': 'NYSE',
+                'market_cap': 0,
+                'market_cap_universe': 'Large Cap',
+            })
 
-        try:
-            # Get S&P 500 tickers
-            sp500_url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-            import pandas as pd
-            tables = pd.read_html(sp500_url)
-            sp500_df = tables[0]
-
-            for _, row in sp500_df.iterrows():
-                ticker = str(row['Symbol']).replace('.', '-')  # Yahoo format
-                raw_sector = row.get('GICS Sector', 'N/A')
-                normalized_sector = normalize_sector(raw_sector)
-
-                stock_info = {
-                    'ticker': ticker,
-                    'name': row.get('Security', ticker),
-                    'sector': normalized_sector,
-                    'raw_sector': raw_sector,
-                    'industry': row.get('GICS Sub-Industry', 'N/A'),
-                    'exchange': 'NYSE',  # Most S&P 500 are NYSE, we'll verify later if needed
-                    'market_cap': 0,  # Will be fetched during enrichment if needed
-                    'market_cap_universe': 'Large Cap',  # S&P 500 are typically large cap+
-                }
-
-                stocks.append(stock_info)
-
-            print(f"Loaded {len(stocks)} stocks from S&P 500")
-
-        except Exception as e:
-            print(f"Error fetching S&P 500 list: {e}")
-            # Fallback to a small list of well-known tickers
-            fallback_tickers = [
-                ('AAPL', 'Apple Inc.', 'Technology'),
-                ('MSFT', 'Microsoft Corp.', 'Technology'),
-                ('GOOGL', 'Alphabet Inc.', 'Communication Services'),
-                ('AMZN', 'Amazon.com Inc.', 'Consumer Cyclical'),
-                ('META', 'Meta Platforms Inc.', 'Communication Services'),
-                ('NVDA', 'NVIDIA Corp.', 'Technology'),
-                ('TSLA', 'Tesla Inc.', 'Consumer Cyclical'),
-                ('JPM', 'JPMorgan Chase', 'Financial Services'),
-                ('JNJ', 'Johnson & Johnson', 'Healthcare'),
-                ('V', 'Visa Inc.', 'Financial Services'),
-                ('PG', 'Procter & Gamble', 'Consumer Defensive'),
-                ('UNH', 'UnitedHealth Group', 'Healthcare'),
-                ('HD', 'Home Depot', 'Consumer Cyclical'),
-                ('MA', 'Mastercard', 'Financial Services'),
-                ('DIS', 'Walt Disney', 'Communication Services'),
-                ('PYPL', 'PayPal Holdings', 'Financial Services'),
-                ('VZ', 'Verizon', 'Communication Services'),
-                ('NFLX', 'Netflix Inc.', 'Communication Services'),
-            ]
-            for ticker, name, sector in fallback_tickers:
-                stocks.append({
-                    'ticker': ticker,
-                    'name': name,
-                    'sector': sector,
-                    'exchange': 'NASDAQ',
-                    'market_cap': 0,
-                    'market_cap_universe': 'Large Cap',
-                })
-
+        print(f"Loaded {len(stocks)} stocks from built-in list")
         return stocks
 
     def _get_roic_universe(self, exchange: str = None) -> List[Dict]:
