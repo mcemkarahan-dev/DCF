@@ -1077,18 +1077,18 @@ with tab_history:
 
                     if show_projection:
                         chart = alt.Chart(chart_df).mark_bar().encode(
-                            x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=0, labelFontSize=10), title=None),
+                            x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9), title=None),
                             y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=10, format='~s'), title=None),
                             color=alt.Color('Type:N', scale=alt.Scale(
                                 domain=['Historical', 'Projected'],
                                 range=[color, '#fbbc04']
                             ), legend=None)
-                        ).properties(height=180, title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold'))
+                        ).properties(height=200, title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold'))
                     else:
                         chart = alt.Chart(chart_df).mark_bar(color=color).encode(
-                            x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=0, labelFontSize=10), title=None),
+                            x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9), title=None),
                             y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=10, format='~s'), title=None)
-                        ).properties(height=180, title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold'))
+                        ).properties(height=200, title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold'))
 
                     return chart
 
@@ -1106,70 +1106,78 @@ with tab_history:
                 else:
                     last_year = datetime.now().year - 1
 
-                # Create 2x3 grid of charts
-                row1_col1, row1_col2, row1_col3 = st.columns(3)
-                row2_col1, row2_col2, row2_col3 = st.columns(3)
+                # Layout: 2/3 for charts (2 cols x 3 rows), 1/3 reserved for future use
+                charts_col, future_col = st.columns([2, 1])
 
-                # Row 1: FCF (with projections), Revenue, Gross Margin
-                with row1_col1:
-                    fcf_chart = create_mini_chart(
-                        historical_data, input_label, f'{input_label} (w/ Proj)',
-                        color='#1a73e8', show_projection=True,
-                        projections=fcf_projections, last_year=last_year
-                    )
-                    if fcf_chart:
-                        st.altair_chart(fcf_chart, use_container_width=True)
+                with charts_col:
+                    # Row 1: FCF, Revenue
+                    r1c1, r1c2 = st.columns(2)
+                    with r1c1:
+                        fcf_chart = create_mini_chart(
+                            historical_data, input_label, f'{input_label} (w/ Proj)',
+                            color='#1a73e8', show_projection=True,
+                            projections=fcf_projections, last_year=last_year
+                        )
+                        if fcf_chart:
+                            st.altair_chart(fcf_chart, use_container_width=True)
 
-                with row1_col2:
-                    rev_chart = create_mini_chart(
-                        revenue_history, 'Revenue', 'Revenue',
-                        color='#34a853'
-                    )
-                    if rev_chart:
-                        st.altair_chart(rev_chart, use_container_width=True)
-                    elif not revenue_history:
-                        st.caption("Revenue: No data")
+                    with r1c2:
+                        rev_chart = create_mini_chart(
+                            revenue_history, 'Revenue', 'Revenue',
+                            color='#34a853'
+                        )
+                        if rev_chart:
+                            st.altair_chart(rev_chart, use_container_width=True)
+                        elif not revenue_history:
+                            st.caption("Revenue: No data")
 
-                with row1_col3:
-                    gm_chart = create_mini_chart(
-                        gross_margin_history, 'Margin %', 'Gross Margin %',
-                        color='#673ab7'
-                    )
-                    if gm_chart:
-                        st.altair_chart(gm_chart, use_container_width=True)
-                    elif not gross_margin_history:
-                        st.caption("Gross Margin: No data")
+                    # Row 2: Gross Margin, Debt
+                    r2c1, r2c2 = st.columns(2)
+                    with r2c1:
+                        gm_chart = create_mini_chart(
+                            gross_margin_history, 'Margin %', 'Gross Margin %',
+                            color='#673ab7'
+                        )
+                        if gm_chart:
+                            st.altair_chart(gm_chart, use_container_width=True)
+                        elif not gross_margin_history:
+                            st.caption("Gross Margin: No data")
 
-                # Row 2: Debt, Capex, Shares Outstanding
-                with row2_col1:
-                    debt_chart = create_mini_chart(
-                        debt_history, 'Debt', 'Total Debt',
-                        color='#ea4335'
-                    )
-                    if debt_chart:
-                        st.altair_chart(debt_chart, use_container_width=True)
-                    elif not debt_history:
-                        st.caption("Debt: No data")
+                    with r2c2:
+                        debt_chart = create_mini_chart(
+                            debt_history, 'Debt', 'Total Debt',
+                            color='#ea4335'
+                        )
+                        if debt_chart:
+                            st.altair_chart(debt_chart, use_container_width=True)
+                        elif not debt_history:
+                            st.caption("Debt: No data")
 
-                with row2_col2:
-                    capex_chart = create_mini_chart(
-                        capex_history, 'Capex', 'Capex',
-                        color='#ff9800'
-                    )
-                    if capex_chart:
-                        st.altair_chart(capex_chart, use_container_width=True)
-                    elif not capex_history:
-                        st.caption("Capex: No data")
+                    # Row 3: Capex, Shares Outstanding
+                    r3c1, r3c2 = st.columns(2)
+                    with r3c1:
+                        capex_chart = create_mini_chart(
+                            capex_history, 'Capex', 'Capex',
+                            color='#ff9800'
+                        )
+                        if capex_chart:
+                            st.altair_chart(capex_chart, use_container_width=True)
+                        elif not capex_history:
+                            st.caption("Capex: No data")
 
-                with row2_col3:
-                    shares_chart = create_mini_chart(
-                        shares_history, 'Shares', 'Shares Outstanding',
-                        color='#00bcd4'
-                    )
-                    if shares_chart:
-                        st.altair_chart(shares_chart, use_container_width=True)
-                    elif not shares_history:
-                        st.caption("Shares: No data")
+                    with r3c2:
+                        shares_chart = create_mini_chart(
+                            shares_history, 'Shares', 'Shares Outstanding',
+                            color='#00bcd4'
+                        )
+                        if shares_chart:
+                            st.altair_chart(shares_chart, use_container_width=True)
+                        elif not shares_history:
+                            st.caption("Shares: No data")
+
+                with future_col:
+                    # Reserved for future use
+                    pass
 
 # Footer
 st.markdown("---")

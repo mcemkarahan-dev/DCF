@@ -434,15 +434,17 @@ class DCFCalculator:
             if year:
                 debt_history.append((year, total_debt))
 
-        # Capex history (make positive for display)
+        # Capex history (keep as negative to show below x-axis)
         capex_history = []
         for cf in cash_flows[:10]:
             date = cf.get('date', 'N/A')
             year = int(date[:4]) if date != 'N/A' else None
             capex = cf.get('capitalExpenditure', 0) or 0
             if year:
-                # Capex is usually negative, make it positive for display
-                capex_history.append((year, abs(capex)))
+                # Keep capex as negative to display below x-axis
+                if capex > 0:
+                    capex = -capex  # Ensure it's negative (cash outflow)
+                capex_history.append((year, capex))
 
         # Shares outstanding history
         shares_history = []
