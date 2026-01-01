@@ -368,12 +368,17 @@ def get_storage_backend() -> str:
 # Track which tickers have been checked (even non-matches) to avoid re-checking
 
 def _get_filter_hash(filters: Dict) -> int:
-    """Create a hash of filter parameters"""
+    """Create a deterministic hash of filter parameters.
+    Uses hashlib instead of Python's hash() which is randomized per session.
+    """
+    import hashlib
     if not filters:
         return 0
     # Sort keys for consistent hashing
     filter_str = json.dumps(filters, sort_keys=True)
-    return hash(filter_str)
+    # Use MD5 for deterministic hash, convert to int (take first 8 bytes)
+    hash_bytes = hashlib.md5(filter_str.encode()).digest()[:8]
+    return int.from_bytes(hash_bytes, byteorder='big', signed=True)
 
 
 # Supabase implementation for checked tickers
