@@ -171,11 +171,35 @@ class RoicDataFetcher:
             # if len(results) == 0:
             #     print(f"DEBUG - Balance sheet fields: {list(item.keys())[:15]}")
             
+            # Calculate total debt from short-term + long-term borrowings
+            short_term_debt = to_float(
+                item.get('bs_st_borrow') or
+                item.get('bs_short_term_debt_detailed') or
+                item.get('shortTermDebt') or 0
+            )
+            long_term_debt = to_float(
+                item.get('bs_lt_borrow') or
+                item.get('bs_long_term_borrowings_detailed') or
+                item.get('longTermDebt') or 0
+            )
+            total_debt = short_term_debt + long_term_debt
+
+            # If still 0, try totalDebt field as fallback
+            if total_debt == 0:
+                total_debt = to_float(item.get('totalDebt') or item.get('bs_tot_liab') or 0)
+
             results.append({
                 'date': item.get('date'),
-                'cashAndCashEquivalents': to_float(item.get('cashAndCashEquivalents')),
-                'totalDebt': to_float(item.get('totalDebt')),
-                'commonStock': to_float(item.get('commonStock') or item.get('totalStockholdersEquity')),
+                'cashAndCashEquivalents': to_float(
+                    item.get('bs_cash_and_equiv') or
+                    item.get('cashAndCashEquivalents') or 0
+                ),
+                'totalDebt': total_debt,
+                'commonStock': to_float(
+                    item.get('bs_sh_out') or
+                    item.get('commonStock') or
+                    item.get('totalStockholdersEquity') or 0
+                ),
                 'period': period
             })
         

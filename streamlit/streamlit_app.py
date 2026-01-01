@@ -1077,18 +1077,18 @@ with tab_history:
 
                     if show_projection:
                         chart = alt.Chart(chart_df).mark_bar().encode(
-                            x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9)),
-                            y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=9)),
+                            x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=0, labelFontSize=10), title=None),
+                            y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=10, format='~s'), title=None),
                             color=alt.Color('Type:N', scale=alt.Scale(
                                 domain=['Historical', 'Projected'],
                                 range=[color, '#fbbc04']
                             ), legend=None)
-                        ).properties(height=150, title=alt.TitleParams(text=title, fontSize=12))
+                        ).properties(height=180, title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold'))
                     else:
                         chart = alt.Chart(chart_df).mark_bar(color=color).encode(
-                            x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=-45, labelFontSize=9)),
-                            y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=9))
-                        ).properties(height=150, title=alt.TitleParams(text=title, fontSize=12))
+                            x=alt.X('Year:N', sort=None, axis=alt.Axis(labelAngle=0, labelFontSize=10), title=None),
+                            y=alt.Y(f'{value_col}:Q', axis=alt.Axis(labelFontSize=10, format='~s'), title=None)
+                        ).properties(height=180, title=alt.TitleParams(text=title, fontSize=13, fontWeight='bold'))
 
                     return chart
 
