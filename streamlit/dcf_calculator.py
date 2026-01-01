@@ -337,13 +337,19 @@ class DCFCalculator:
             print(f"\nExtracting EPS from Continuing Operations:")
             for i, inc in enumerate(income_statements[:10]):
                 eps = inc.get('eps_cont_ops')
-                date = inc.get('date', 'N/A')
+                date = inc.get('date')
                 if eps and eps != 0:
                     # Store EPS as-is (per share)
                     historical_values.append(eps)
-                    # Extract year from date (format: YYYY-MM-DD)
-                    year = int(date[:4]) if date != 'N/A' else (2024 - i)
-                    historical_data.append((year, eps))
+                    # Extract year from date safely
+                    year = None
+                    if date and date != 'N/A':
+                        try:
+                            year = int(str(date)[:4])
+                        except (ValueError, TypeError):
+                            pass
+                    if year:
+                        historical_data.append((year, eps))
                     print(f"  {date}: EPS = ${eps:.2f}")
                 else:
                     print(f"  {date}: EPS = 0 or missing")
@@ -385,9 +391,15 @@ class DCFCalculator:
                 if fcf and fcf != 0 and period_shares > 0:
                     fcf_per_share = fcf / period_shares
                     historical_values.append(fcf_per_share)
-                    # Extract year from date (format: YYYY-MM-DD)
-                    year = int(date[:4]) if date != 'N/A' else (2024 - i)
-                    historical_data.append((year, fcf_per_share))
+                    # Extract year from date safely
+                    year = None
+                    if date and date != 'N/A':
+                        try:
+                            year = int(str(date)[:4])
+                        except (ValueError, TypeError):
+                            pass
+                    if year:
+                        historical_data.append((year, fcf_per_share))
                     print(f"  {date}: FCF = ${fcf:,.0f}, Shares = {period_shares:,.0f}, FCF/share = ${fcf_per_share:.2f}")
                 elif fcf and fcf != 0:
                     print(f"  {date}: FCF = ${fcf:,.0f} (missing shares data - skipping)")

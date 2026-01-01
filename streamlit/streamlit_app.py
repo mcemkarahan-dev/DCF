@@ -5,6 +5,7 @@ Google Flights-inspired UI with horizontal tabs and filter bar
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import sys
 import os
 from datetime import datetime, timedelta
@@ -1130,6 +1131,19 @@ with tab_history:
                             labelExpr="datum.value >= 1e9 ? format(datum.value/1e9, '.1f') + 'B' : datum.value >= 1e6 ? format(datum.value/1e6, '.1f') + 'M' : format(datum.value, ',.0f')"
                         )
 
+                    # Calculate trendline manually for historical data
+                    hist_df = chart_df[chart_df['Type'] == 'Historical'].copy()
+                    trend_values = []
+                    if len(hist_df) >= 2:
+                        x_vals = hist_df['YearNum'].values
+                        y_vals = hist_df[value_col].values
+                        # Simple linear regression
+                        slope, intercept = np.polyfit(x_vals, y_vals, 1)
+                        for yn in hist_df['YearNum']:
+                            trend_values.append(intercept + slope * yn)
+                        hist_df = hist_df.copy()
+                        hist_df['Trend'] = trend_values
+
                     # Bar chart
                     if show_projection:
                         bars = alt.Chart(chart_df).mark_bar().encode(
@@ -1146,18 +1160,15 @@ with tab_history:
                             y=alt.Y(f'{value_col}:Q', axis=y_axis, title=None)
                         )
 
-                    # Trendline (regression on historical data only)
-                    hist_df = chart_df[chart_df['Type'] == 'Historical'].copy()
-                    if len(hist_df) >= 2:
-                        trendline = alt.Chart(hist_df).transform_regression(
-                            'YearNum', value_col
-                        ).mark_line(
+                    # Add trendline if we have enough data
+                    if len(hist_df) >= 2 and 'Trend' in hist_df.columns:
+                        trendline = alt.Chart(hist_df).mark_line(
                             color='#333333',
                             strokeDash=[4, 4],
                             strokeWidth=2
                         ).encode(
                             x=alt.X('Year:N', sort=None),
-                            y=alt.Y(f'{value_col}:Q')
+                            y=alt.Y('Trend:Q')
                         )
                         chart = (bars + trendline).properties(
                             height=200,
