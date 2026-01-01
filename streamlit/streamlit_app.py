@@ -1124,14 +1124,14 @@ with tab_history:
 
             history_data.append({
                 'Ticker': r.get('ticker', ''),
+                'Company': r.get('company_name', '')[:25],
                 'Universe': get_market_cap_universe(mkt_cap),
                 'Sector': r.get('sector', 'N/A'),
-                'Company': r.get('company_name', '')[:25],
                 'Price': r.get('current_price', 0),
-                'Intrinsic': r.get('intrinsic_value', 0),
+                'IV': r.get('intrinsic_value', 0),
                 'Discount': r.get('discount', 0),
                 'Market Cap': mkt_cap,
-                'Last Run': run_date,
+                'Last Run': run_date.date() if run_date else None,
             })
 
         history_df = pd.DataFrame(history_data)
@@ -1181,7 +1181,7 @@ with tab_history:
 
             # Apply positive IV filter (from button toggle)
             if st.session_state.show_positive_iv_only:
-                filtered_df = filtered_df[filtered_df['Intrinsic'] > 0]
+                filtered_df = filtered_df[filtered_df['IV'] > 0]
 
             # Apply undervalued filter (positive discount = trading below IV)
             if st.session_state.show_undervalued_only:
@@ -1212,8 +1212,9 @@ with tab_history:
             else:
                 selected_ticker = None
 
-            # Drop raw Market Cap column, keep formatted Mkt Cap
+            # Drop raw Market Cap column, keep formatted Mkt Cap, reorder columns
             display_df = filtered_df.drop(columns=['Market Cap'])
+            display_df = display_df[['Ticker', 'Company', 'Universe', 'Sector', 'Price', 'IV', 'Discount', 'Mkt Cap', 'Last Run']]
 
             # Highlight selected row with understated light blue
             def highlight_selected(row):
@@ -1231,14 +1232,14 @@ with tab_history:
                 height=350,
                 column_config={
                     "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                    "Company": st.column_config.TextColumn("Company", width="medium"),
                     "Universe": st.column_config.TextColumn("Universe", width="small"),
                     "Sector": st.column_config.TextColumn("Sector", width="small"),
-                    "Company": st.column_config.TextColumn("Company", width="medium"),
                     "Price": st.column_config.NumberColumn("Price", format="$%.2f", width="small"),
-                    "Intrinsic": st.column_config.NumberColumn("Intrinsic", format="$%.2f", width="small"),
+                    "IV": st.column_config.NumberColumn("IV", format="$%.2f", width="small"),
                     "Discount": st.column_config.NumberColumn("Discount", format="%.1f%%", width="small"),
                     "Mkt Cap": st.column_config.TextColumn("Mkt Cap", width="small"),
-                    "Last Run": st.column_config.DatetimeColumn("Last Run", format="MM/DD/YY HH:mm", width="small"),
+                    "Last Run": st.column_config.DateColumn("Last Run", format="MM/DD/YY", width="small"),
                 }
             )
 
