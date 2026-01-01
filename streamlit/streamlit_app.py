@@ -457,27 +457,21 @@ def was_recently_analyzed(ticker, params, days=10):
 
 # ==================== HEADER ====================
 # Logo SVG - two cartoon eyes with connecting curve (white background)
-logo_svg = '''
-<svg class="logo-svg" viewBox="0 0 60 32" xmlns="http://www.w3.org/2000/svg">
-  <!-- Connecting curve (brow/bridge) -->
-  <path d="M12 8 Q30 2 48 8" stroke="#3c4043" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <!-- Left eye -->
-  <circle cx="14" cy="18" r="11" fill="white" stroke="#3c4043" stroke-width="2"/>
-  <circle cx="14" cy="18" r="4" fill="#202124"/>
-  <circle cx="12" cy="16" r="1.5" fill="white"/>
-  <!-- Right eye -->
-  <circle cx="46" cy="18" r="11" fill="white" stroke="#3c4043" stroke-width="2"/>
-  <circle cx="46" cy="18" r="4" fill="#202124"/>
-  <circle cx="44" cy="16" r="1.5" fill="white"/>
-</svg>
-'''
-
-st.markdown(f'''
+header_html = """
 <div class="logo-header">
-    {logo_svg}
-    <p class="main-header">DCF Stock Analyzer</p>
+    <svg class="logo-svg" viewBox="0 0 60 32" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 8 Q30 2 48 8" stroke="#3c4043" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <circle cx="14" cy="18" r="11" fill="white" stroke="#3c4043" stroke-width="2"/>
+        <circle cx="14" cy="18" r="4" fill="#202124"/>
+        <circle cx="12" cy="16" r="1.5" fill="white"/>
+        <circle cx="46" cy="18" r="11" fill="white" stroke="#3c4043" stroke-width="2"/>
+        <circle cx="46" cy="18" r="4" fill="#202124"/>
+        <circle cx="44" cy="16" r="1.5" fill="white"/>
+    </svg>
+    <span class="main-header">DCF Stock Analyzer</span>
 </div>
-''', unsafe_allow_html=True)
+"""
+st.markdown(header_html, unsafe_allow_html=True)
 
 # ==================== MAIN TABS (Google Flights Style) ====================
 tab_analyze, tab_batch, tab_history, tab_settings = st.tabs([
