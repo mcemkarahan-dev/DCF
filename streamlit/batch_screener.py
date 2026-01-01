@@ -233,10 +233,10 @@ class BatchScreener:
 
     def _get_yahoo_universe(self, exchange: str = None) -> List[Dict]:
         """
-        Get stock universe - uses a reliable built-in list of major stocks.
+        Get stock universe - uses a reliable built-in list of stocks across market caps.
         """
-        # Use a hardcoded list of major S&P 500 stocks - more reliable than web scraping
-        SP500_STOCKS = [
+        # Mega/Large Cap stocks (S&P 500)
+        LARGE_CAP_STOCKS = [
             ('AAPL', 'Apple Inc.', 'Technology'),
             ('MSFT', 'Microsoft Corp.', 'Technology'),
             ('GOOGL', 'Alphabet Inc.', 'Communication Services'),
@@ -329,18 +329,135 @@ class BatchScreener:
             ('ECL', 'Ecolab', 'Basic Materials'),
         ]
 
+        # Mid Cap stocks
+        MID_CAP_STOCKS = [
+            ('ETSY', 'Etsy Inc.', 'Consumer Cyclical'),
+            ('ROKU', 'Roku Inc.', 'Communication Services'),
+            ('SNAP', 'Snap Inc.', 'Communication Services'),
+            ('PINS', 'Pinterest', 'Communication Services'),
+            ('DKNG', 'DraftKings', 'Consumer Cyclical'),
+            ('CROX', 'Crocs Inc.', 'Consumer Cyclical'),
+            ('BILL', 'Bill.com', 'Technology'),
+            ('CFLT', 'Confluent', 'Technology'),
+            ('PATH', 'UiPath', 'Technology'),
+            ('GTLB', 'GitLab', 'Technology'),
+            ('NET', 'Cloudflare', 'Technology'),
+            ('DDOG', 'Datadog', 'Technology'),
+            ('ZS', 'Zscaler', 'Technology'),
+            ('OKTA', 'Okta Inc.', 'Technology'),
+            ('TWLO', 'Twilio', 'Technology'),
+            ('RNG', 'RingCentral', 'Technology'),
+            ('HUBS', 'HubSpot', 'Technology'),
+            ('DOCU', 'DocuSign', 'Technology'),
+            ('WIX', 'Wix.com', 'Technology'),
+            ('DBX', 'Dropbox', 'Technology'),
+        ]
+
+        # Small Cap stocks ($300M - $2B)
+        SMALL_CAP_STOCKS = [
+            ('APPS', 'Digital Turbine', 'Technology'),
+            ('BIGC', 'BigCommerce', 'Technology'),
+            ('UPST', 'Upstart Holdings', 'Financial Services'),
+            ('SOFI', 'SoFi Technologies', 'Financial Services'),
+            ('AFRM', 'Affirm Holdings', 'Financial Services'),
+            ('BMBL', 'Bumble Inc.', 'Communication Services'),
+            ('TUYA', 'Tuya Inc.', 'Technology'),
+            ('OPEN', 'Opendoor', 'Real Estate'),
+            ('WISH', 'ContextLogic', 'Consumer Cyclical'),
+            ('BIRD', 'Allbirds', 'Consumer Cyclical'),
+            ('RENT', 'Rent the Runway', 'Consumer Cyclical'),
+            ('PTON', 'Peloton', 'Consumer Cyclical'),
+            ('CHGG', 'Chegg Inc.', 'Consumer Cyclical'),
+            ('COUR', 'Coursera', 'Consumer Cyclical'),
+            ('DUOL', 'Duolingo', 'Consumer Cyclical'),
+            ('ABNB', 'Airbnb', 'Consumer Cyclical'),
+            ('LYFT', 'Lyft Inc.', 'Industrials'),
+            ('GRPN', 'Groupon', 'Consumer Cyclical'),
+            ('IRBT', 'iRobot', 'Consumer Cyclical'),
+            ('LMND', 'Lemonade', 'Financial Services'),
+        ]
+
+        # Micro Cap stocks ($50M - $300M)
+        MICRO_CAP_STOCKS = [
+            ('SMSI', 'Smith Micro', 'Technology'),
+            ('INUV', 'Inuvo Inc.', 'Technology'),
+            ('CUEN', 'Cuentas Inc.', 'Technology'),
+            ('QNRX', 'Quoin Pharma', 'Healthcare'),
+            ('BIOR', 'Biora Therapeutics', 'Healthcare'),
+            ('DRUG', 'Bright Minds Bio', 'Healthcare'),
+            ('CRIS', 'Curis Inc.', 'Healthcare'),
+            ('OCGN', 'Ocugen Inc.', 'Healthcare'),
+            ('SNES', 'SenesTech', 'Healthcare'),
+            ('CTSO', 'Cytosorbents', 'Healthcare'),
+            ('GRAY', 'Graybug Vision', 'Healthcare'),
+            ('ARDS', 'Aridis Pharma', 'Healthcare'),
+            ('ARQT', 'Arcus Biosciences', 'Healthcare'),
+            ('NVAX', 'Novavax', 'Healthcare'),
+            ('IOVA', 'Iovance Bio', 'Healthcare'),
+            ('SAVA', 'Cassava Sciences', 'Healthcare'),
+            ('MNKD', 'MannKind Corp.', 'Healthcare'),
+            ('XERS', 'Xeris Biopharma', 'Healthcare'),
+            ('APLS', 'Apellis Pharma', 'Healthcare'),
+            ('ALXO', 'ALX Oncology', 'Healthcare'),
+            ('AUTL', 'Autolus Therapeutics', 'Healthcare'),
+            ('JSPR', 'Jasper Therapeutics', 'Healthcare'),
+            ('PMVP', 'PMV Pharma', 'Healthcare'),
+            ('ROIV', 'Roivant Sciences', 'Healthcare'),
+            ('SLDB', 'Solid Biosciences', 'Healthcare'),
+            ('TSHA', 'Taysha Gene', 'Healthcare'),
+            ('VCNX', 'Vaccinex', 'Healthcare'),
+            ('VERU', 'Veru Inc.', 'Healthcare'),
+            ('VYGR', 'Voyager Therapeutics', 'Healthcare'),
+            ('CLVR', 'Clever Leaves', 'Healthcare'),
+        ]
+
         stocks = []
-        for ticker, name, sector in SP500_STOCKS:
+
+        # Add Large Cap stocks
+        for ticker, name, sector in LARGE_CAP_STOCKS:
             stocks.append({
                 'ticker': ticker,
                 'name': name,
                 'sector': sector,
                 'exchange': 'NYSE',
-                'market_cap': 0,
+                'market_cap': 50e9,  # Approximate for sorting
                 'market_cap_universe': 'Large Cap',
             })
 
-        print(f"Loaded {len(stocks)} stocks from built-in list")
+        # Add Mid Cap stocks
+        for ticker, name, sector in MID_CAP_STOCKS:
+            stocks.append({
+                'ticker': ticker,
+                'name': name,
+                'sector': sector,
+                'exchange': 'NASDAQ',
+                'market_cap': 5e9,
+                'market_cap_universe': 'Mid Cap',
+            })
+
+        # Add Small Cap stocks
+        for ticker, name, sector in SMALL_CAP_STOCKS:
+            stocks.append({
+                'ticker': ticker,
+                'name': name,
+                'sector': sector,
+                'exchange': 'NASDAQ',
+                'market_cap': 500e6,
+                'market_cap_universe': 'Small Cap',
+            })
+
+        # Add Micro Cap stocks
+        for ticker, name, sector in MICRO_CAP_STOCKS:
+            stocks.append({
+                'ticker': ticker,
+                'name': name,
+                'sector': sector,
+                'exchange': 'NASDAQ',
+                'market_cap': 100e6,
+                'market_cap_universe': 'Micro Cap',
+            })
+
+        print(f"Loaded {len(stocks)} stocks from built-in list (Large: {len(LARGE_CAP_STOCKS)}, Mid: {len(MID_CAP_STOCKS)}, Small: {len(SMALL_CAP_STOCKS)}, Micro: {len(MICRO_CAP_STOCKS)})")
         return stocks
 
     def _get_roic_universe(self, exchange: str = None) -> List[Dict]:
