@@ -947,6 +947,14 @@ with tab_batch:
 
 # ==================== TAB: ANALYSIS HISTORY ====================
 with tab_history:
+    # Clear history button
+    col_clear, col_spacer = st.columns([1, 5])
+    with col_clear:
+        if st.button("Clear History", type="secondary"):
+            db_storage.clear_all_history()
+            st.session_state.analysis_history = []
+            st.rerun()
+
     if not st.session_state.analysis_history:
         st.info("No analyses yet. Analyze stocks to see them here.")
     else:
