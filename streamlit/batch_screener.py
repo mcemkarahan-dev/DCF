@@ -222,13 +222,17 @@ class BatchScreener:
             from data_fetcher_yahoo import YahooFinanceFetcher
             self.fetcher = YahooFinanceFetcher(api_key)
 
-    def get_stock_universe(self, exchange: str = None) -> List[Dict]:
+    def get_stock_universe(self, exchange: str = None, filters: Dict = None) -> List[Dict]:
         """
         Get the universe of stocks to screen.
         Returns list of dicts with basic info: ticker, name, sector, exchange, market_cap
+
+        Args:
+            exchange: Optional exchange filter (legacy)
+            filters: Dict of filter values for server-side filtering (sector, exchange, market_cap_universe)
         """
         if self.data_source == "roic":
-            return self._get_roic_universe(exchange)
+            return self._get_roic_universe(exchange, filters)
         else:
             return self._get_yahoo_universe(exchange)
 
@@ -597,21 +601,63 @@ class BatchScreener:
             print("Falling back to built-in list...")
             return None
 
-    def _get_roic_universe(self, exchange: str = None) -> List[Dict]:
+    def _get_roic_universe(self, exchange: str = None, filters: Dict = None) -> List[Dict]:
         """
-        Get stock universe dynamically from NASDAQ's free ticker list.
-        Falls back to built-in list if fetch fails.
+        Get stock universe from ROIC.ai with SERVER-SIDE filtering.
+        This is much faster as filtering happens at data fetch time.
+        Falls back to NASDAQ list or built-in list if ROIC fails.
+
+        Args:
+            exchange: Legacy exchange filter
+            filters: Dict with sector, exchange, market_cap_universe lists
         """
-        # Try to fetch dynamic list first
+        # Extract filter lists for server-side filtering
+        sectors = filters.get('sector', []) if filters else []
+        exchanges = filters.get('exchange', []) if filters else []
+        market_caps = filters.get('market_cap_universe', []) if filters else []
+
+        # Handle legacy exchange parameter
+        if exchange and not exchanges:
+            exchanges = [exchange]
+
+        # Try ROIC.ai server-side filtered fetch first
+        try:
+            print(f"Fetching filtered tickers from ROIC.ai (sectors={len(sectors)}, exchanges={len(exchanges)}, caps={len(market_caps)})...")
+            stocks = self.fetcher.get_filtered_tickers(
+                sectors=sectors if sectors else None,
+                exchanges=exchanges if exchanges else None,
+                market_cap_universes=market_caps if market_caps else None
+            )
+
+            if stocks and len(stocks) > 0:
+                # Convert to standard format expected by screener
+                result = []
+                for s in stocks:
+                    result.append({
+                        'ticker': s.get('ticker') or s.get('symbol'),
+                        'name': s.get('name', ''),
+                        'sector': s.get('sector', 'N/A'),
+                        'exchange': s.get('exchange', 'N/A'),
+                        'market_cap': s.get('market_cap') or s.get('marketCap') or 0,
+                        'market_cap_universe': s.get('market_cap_universe', 'Unknown'),
+                    })
+                print(f"ROIC.ai returned {len(result)} pre-filtered tickers")
+                return result
+
+        except Exception as e:
+            print(f"ROIC.ai filtered fetch failed: {e}")
+
+        # Fallback: Try NASDAQ ticker list
+        print("Falling back to NASDAQ ticker list...")
         stocks = self._fetch_nasdaq_tickers()
 
         if stocks:
-            # Filter by exchange if specified
-            if exchange:
-                stocks = [s for s in stocks if s['exchange'] == exchange]
+            # Apply filters client-side for fallback
+            if exchanges:
+                stocks = [s for s in stocks if s['exchange'] in exchanges]
             return stocks
 
-        # Fallback to static list
+        # Final fallback to static list
         print("Using fallback built-in stock list...")
         return self._get_yahoo_universe(exchange)
 
@@ -838,8 +884,23 @@ class BatchScreener:
             return True
         return False
 
-    def needs_enrichment(self, filters: Dict) -> bool:
-        """Check if we need to enrich stocks with additional data"""
+    def needs_enrichment(self, filters: Dict, pre_filtered: bool = False) -> bool:
+        """
+        Check if we need to enrich stocks with additional data.
+
+        Args:
+            filters: Dict of filter values
+            pre_filtered: If True, data was pre-filtered server-side (ROIC.ai)
+                         so we don't need enrichment for sector/exchange/market_cap
+        """
+        # If data is pre-filtered from ROIC.ai, we don't need enrichment for basic filters
+        if pre_filtered:
+            # Only need enrichment for gross margin (not included in ticker metadata)
+            if filters.get('min_gross_margin', 0) > 0:
+                return True
+            return False
+
+        # For non-pre-filtered data (NASDAQ list), need enrichment for these filters
         # Need enrichment if sector filter is active (NASDAQ stocks don't have sector)
         if filters.get('sector') and len(filters['sector']) > 0:
             return True
@@ -872,11 +933,12 @@ class BatchScreener:
         Yields:
             Stock dicts that pass all filters
         """
-        # Get initial universe
+        # Get initial universe with SERVER-SIDE filtering for basic filters
+        # This pre-filters by sector, exchange, and market cap at the API level
         if progress_callback:
-            progress_callback(0, 100, "Fetching stock universe...", True)
+            progress_callback(0, 100, "Fetching filtered stock universe...", True)
 
-        stocks = self.get_stock_universe()
+        stocks = self.get_stock_universe(filters=filters)
 
         # Filter out excluded tickers upfront for efficiency
         if exclude_tickers:
@@ -896,53 +958,60 @@ class BatchScreener:
 
         total_stocks = len(stocks)
         matched_count = 0
-        need_enrichment = self.needs_enrichment(filters)
+
+        # Check if data was pre-filtered (ROIC.ai provides metadata, so basic filters already applied)
+        # Pre-filtered data has market_cap_universe already set
+        pre_filtered = (self.data_source == "roic" and
+                       len(stocks) > 0 and
+                       stocks[0].get('market_cap_universe') not in [None, 'Unknown'])
+
+        if pre_filtered:
+            print(f"Using pre-filtered data from ROIC.ai ({total_stocks} stocks)")
+
+        need_enrichment = self.needs_enrichment(filters, pre_filtered=pre_filtered)
         need_financial = self.has_financial_filters(filters)
 
-        # print(f"DEBUG: need_enrichment={need_enrichment}, need_financial={need_financial}")
-        # print(f"DEBUG: filters={filters}")
-
         if progress_callback:
-            progress_callback(5, 100, f"Screening {total_stocks} stocks...", True)
+            progress_callback(5, 100, f"Screening {total_stocks} pre-filtered stocks...", True)
 
         for i, stock in enumerate(stocks):
             if max_stocks and matched_count >= max_stocks:
-                # print(f"DEBUG: Reached max_stocks limit ({max_stocks})")
                 break
 
             # Progress update - pass actual count, not percentage
             if progress_callback:
                 progress_callback(i + 1, total_stocks, f"Checking {stock['ticker']}...", True)
 
-            # Step 1: Basic filters (sector, exchange) - fast, no API call
-            passes_basic = self.passes_basic_filters(stock, filters)
-            if not passes_basic:
-                # if i < 5:  # Debug first few
-                #     print(f"DEBUG: {stock['ticker']} failed basic filters")
-                continue
+            # Step 1: Basic filters - SKIP if data was pre-filtered server-side
+            if not pre_filtered:
+                passes_basic = self.passes_basic_filters(stock, filters)
+                if not passes_basic:
+                    continue
 
             # Track if this ticker required slow operations (enrichment/financial)
             required_slow_check = need_enrichment or need_financial
             passed_all = True
 
-            # Step 2: Enrichment if needed (market cap universe, sector, gross margin)
+            # Step 2: Enrichment if needed (only for gross margin when pre-filtered)
             if need_enrichment:
                 stock = self.enrich_stock_info(stock)
                 time.sleep(0.1)  # Rate limiting
 
-                # Re-check sector filter after enrichment (sector may have been N/A before)
-                sector_filter = filters.get('sector', [])
-                if sector_filter and len(sector_filter) > 0:
-                    stock_sector = stock.get('sector', 'N/A')
-                    if stock_sector != 'N/A' and stock_sector not in sector_filter:
-                        passed_all = False
-
-                # Re-check market cap filter after enrichment
-                if passed_all:
-                    market_cap_filter = filters.get('market_cap_universe', [])
-                    if market_cap_filter and len(market_cap_filter) > 0:
-                        if stock.get('market_cap_universe', 'Unknown') not in market_cap_filter:
+                # Only re-check filters if data wasn't pre-filtered
+                if not pre_filtered:
+                    # Re-check sector filter after enrichment
+                    sector_filter = filters.get('sector', [])
+                    if sector_filter and len(sector_filter) > 0:
+                        stock_sector = stock.get('sector', 'N/A')
+                        if stock_sector != 'N/A' and stock_sector not in sector_filter:
                             passed_all = False
+
+                    # Re-check market cap filter after enrichment
+                    if passed_all:
+                        market_cap_filter = filters.get('market_cap_universe', [])
+                        if market_cap_filter and len(market_cap_filter) > 0:
+                            if stock.get('market_cap_universe', 'Unknown') not in market_cap_filter:
+                                passed_all = False
 
             # Step 3: Financial filters if needed
             if passed_all and need_financial:

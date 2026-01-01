@@ -438,6 +438,115 @@ class RoicDataFetcher:
 
         print(f"ROIC.ai returned {len(results)} tickers")
         return results
+
+    def get_filtered_tickers(self, sectors: List[str] = None, exchanges: List[str] = None,
+                             market_cap_universes: List[str] = None) -> List[Dict]:
+        """
+        Get tickers from ROIC.ai with SERVER-SIDE filtering.
+        Filters are applied at data fetch time to minimize client processing.
+
+        Args:
+            sectors: List of sectors to include (empty = all)
+            exchanges: List of exchanges to include (empty = all)
+            market_cap_universes: List of market cap tiers (empty = all)
+                Options: "Mega Cap", "Large Cap", "Mid Cap", "Small Cap", "Micro Cap"
+
+        Returns:
+            List of ticker dicts matching the filters
+        """
+        endpoint = "tickers"
+        data = self._make_request(endpoint)
+
+        if not data:
+            print("Warning: ROIC.ai /tickers endpoint returned no data")
+            return []
+
+        # Market cap thresholds for universe classification
+        def get_market_cap_universe(mkt_cap):
+            if not mkt_cap or mkt_cap == 0:
+                return "Unknown"
+            if mkt_cap >= 200e9:
+                return "Mega Cap"
+            elif mkt_cap >= 10e9:
+                return "Large Cap"
+            elif mkt_cap >= 2e9:
+                return "Mid Cap"
+            elif mkt_cap >= 300e6:
+                return "Small Cap"
+            elif mkt_cap >= 50e6:
+                return "Micro Cap"
+            else:
+                return "Nano Cap"
+
+        # Normalize exchange names
+        def normalize_exchange(exch):
+            if not exch:
+                return 'N/A'
+            exch_upper = exch.upper()
+            if 'NASDAQ' in exch_upper or 'NMS' in exch_upper or 'NGM' in exch_upper:
+                return 'NASDAQ'
+            elif 'NYSE' in exch_upper or 'NYQ' in exch_upper:
+                return 'NYSE'
+            elif 'AMEX' in exch_upper:
+                return 'AMEX'
+            return exch
+
+        results = []
+        filtered_out = {'sector': 0, 'exchange': 0, 'market_cap': 0}
+
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+
+            symbol = item.get('symbol') or item.get('ticker')
+            if not symbol:
+                continue
+
+            # Extract metadata
+            raw_sector = item.get('sector') or 'N/A'
+            raw_exchange = item.get('exchange') or item.get('exchangeShortName') or 'N/A'
+            market_cap = item.get('marketCap') or item.get('mktCap') or 0
+
+            # Normalize values
+            exchange = normalize_exchange(raw_exchange)
+            universe = get_market_cap_universe(market_cap)
+
+            # Apply filters (empty list = include all)
+            # Sector filter
+            if sectors and len(sectors) > 0:
+                if raw_sector == 'N/A' or raw_sector not in sectors:
+                    filtered_out['sector'] += 1
+                    continue
+
+            # Exchange filter
+            if exchanges and len(exchanges) > 0:
+                if exchange == 'N/A' or exchange not in exchanges:
+                    filtered_out['exchange'] += 1
+                    continue
+
+            # Market cap universe filter
+            if market_cap_universes and len(market_cap_universes) > 0:
+                if universe == 'Unknown' or universe not in market_cap_universes:
+                    filtered_out['market_cap'] += 1
+                    continue
+
+            # Passed all filters
+            results.append({
+                'symbol': symbol,
+                'ticker': symbol,  # Alias for compatibility
+                'name': item.get('name') or item.get('companyName') or symbol,
+                'sector': raw_sector,
+                'exchange': exchange,
+                'marketCap': market_cap,
+                'market_cap': market_cap,  # Alias for compatibility
+                'market_cap_universe': universe,
+            })
+
+        print(f"ROIC.ai: {len(data)} total → {len(results)} after filters "
+              f"(filtered: sector={filtered_out['sector']}, exchange={filtered_out['exchange']}, "
+              f"market_cap={filtered_out['market_cap']})")
+
+        return results
     
     def calculate_fcf_from_statements(self, cash_flow: Dict) -> float:
         """
