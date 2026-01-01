@@ -1204,21 +1204,22 @@ with tab_history:
                             y=alt.Y(f'{value_col}:Q', axis=y_axis, title=None)
                         )
 
-                    # Data labels on bars
+                    # Data labels centered inside bars
                     label_angle = 270 if vertical_labels else 0
-                    label_align = 'left' if vertical_labels else 'center'
-                    label_dy = -5 if vertical_labels else -8
+
+                    # Calculate midpoint for label positioning (half of bar height)
+                    chart_df['LabelY'] = chart_df[value_col] / 2
 
                     data_labels = alt.Chart(chart_df).mark_text(
-                        align=label_align,
-                        baseline='bottom' if not vertical_labels else 'middle',
+                        align='center',
+                        baseline='middle',
                         angle=label_angle,
                         fontSize=8,
-                        color=COLOR_LABEL,
-                        dy=label_dy
+                        color='white',
+                        fontWeight='bold'
                     ).encode(
                         x=alt.X('Year:N', sort=None),
-                        y=alt.Y(f'{value_col}:Q'),
+                        y=alt.Y('LabelY:Q'),
                         text='Label:N'
                     )
 
