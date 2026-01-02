@@ -955,6 +955,9 @@ class BatchScreener:
             print(f"DEBUG: First 5 universe tickers AFTER filter: {first_after}")
             print(f"DEBUG: Skipped {skipped} tickers that were in exclude_tickers")
 
+            # Store first ticker for UI display
+            self._first_ticker_to_process = first_after[0] if first_after else "N/A"
+
         # print(f"DEBUG: Got {len(stocks)} stocks in universe")
 
         if not stocks:

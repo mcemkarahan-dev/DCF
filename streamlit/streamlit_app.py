@@ -951,13 +951,18 @@ with tab_batch:
             hash_bytes = hashlib.md5(filter_str.encode()).digest()[:8]
             filter_hash = int.from_bytes(hash_bytes, byteorder='big', signed=True)
 
-            with st.expander(f"🔍 Debug: Cache Status (hash: {filter_hash})", expanded=False):
+            debug_expander = st.expander(f"🔍 Debug: Cache Status (hash: {filter_hash})", expanded=True)
+            with debug_expander:
                 st.code(f"Filter hash: {filter_hash}\nFilters: {filter_str[:200]}...")
                 st.write(f"**Recently checked tickers in DB:** {len(recently_checked)}")
                 if recently_checked:
                     sample = sorted(list(recently_checked))[:20]
                     st.write(f"**First 20 cached:** {', '.join(sample)}")
+                    # Show LAST cached ticker (where we should resume from)
+                    last_cached = sorted(list(recently_checked))[-1]
+                    st.write(f"**Last cached ticker:** {last_cached}")
                 st.write(f"**Tickers in history:** {len(existing_tickers)}")
+                st.write(f"**Total to skip:** {len(recently_checked | existing_tickers)}")
 
             try:
                 source = "roic" if "Roic" in data_source else "yahoo"
@@ -1004,11 +1009,23 @@ with tab_batch:
 
                 # Screen stocks
                 status_text.text("Screening stocks...")
+                first_processed = [None]  # Track first ticker processed
+
+                def on_checked_with_tracking(ticker: str, matched: bool):
+                    """Save each checked ticker and track first one"""
+                    if first_processed[0] is None:
+                        first_processed[0] = ticker
+                        # Update debug display with first ticker
+                        with debug_expander:
+                            st.write(f"**🚀 STARTING FROM:** {ticker}")
+                    db_storage.save_checked_ticker(ticker, batch_filters, matched)
+                    saved_count[0] += 1
+
                 all_matched = list(screener.screen_stocks_streaming(
                     filters=batch_filters,
                     progress_callback=update_progress,
                     match_callback=on_match,
-                    checked_callback=on_checked,
+                    checked_callback=on_checked_with_tracking,
                     exclude_tickers=all_skip_tickers,
                     max_stocks=max_stocks
                 ))
