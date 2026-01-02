@@ -477,6 +477,8 @@ st.markdown('''
         <ellipse cx="20" cy="34" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5" transform="rotate(8 20 34)"/>
         <ellipse cx="20" cy="32" rx="14" ry="4" fill="#f0f0f0" stroke="#777" stroke-width="1" transform="rotate(8 20 32)"/>
         <ellipse cx="20" cy="30" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5" transform="rotate(8 20 30)"/>
+        <!-- Flash yellow swoosh arch across cookies -->
+        <path d="M 2 38 Q 40 8 78 28" fill="none" stroke="#FFD700" stroke-width="3" stroke-linecap="round"/>
         <!-- Crumbs -->
         <circle cx="62" cy="40" r="1.5" fill="#777"/>
         <circle cx="67" cy="38" r="1" fill="#888"/>
