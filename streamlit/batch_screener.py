@@ -234,9 +234,9 @@ class BatchScreener:
         if self.data_source == "roic":
             return self._get_roic_universe(exchange, filters)
         else:
-            return self._get_yahoo_universe(exchange)
+            return self._get_yahoo_universe(exchange, filters)
 
-    def _get_yahoo_universe(self, exchange: str = None) -> List[Dict]:
+    def _get_yahoo_universe(self, exchange: str = None, filters: Dict = None) -> List[Dict]:
         """
         Get stock universe - uses a reliable built-in list of stocks across market caps.
         Format: (ticker, name, sector, exchange)
@@ -542,6 +542,28 @@ class BatchScreener:
             })
 
         print(f"Loaded {len(stocks)} stocks from built-in list (Large: {len(LARGE_CAP_STOCKS)}, Mid: {len(MID_CAP_STOCKS)}, Small: {len(SMALL_CAP_STOCKS)}, Micro: {len(MICRO_CAP_STOCKS)})")
+
+        # Apply filters if provided
+        if filters:
+            original_count = len(stocks)
+
+            # Filter by sector
+            sector_filter = filters.get('sector', [])
+            if sector_filter and len(sector_filter) > 0:
+                stocks = [s for s in stocks if s['sector'] in sector_filter]
+
+            # Filter by exchange
+            exchange_filter = filters.get('exchange', [])
+            if exchange_filter and len(exchange_filter) > 0:
+                stocks = [s for s in stocks if s['exchange'] in exchange_filter]
+
+            # Filter by market cap universe
+            cap_filter = filters.get('market_cap_universe', [])
+            if cap_filter and len(cap_filter) > 0:
+                stocks = [s for s in stocks if s['market_cap_universe'] in cap_filter]
+
+            print(f"Filtered from {original_count} to {len(stocks)} stocks")
+
         return stocks
 
     def _fetch_nasdaq_tickers(self) -> List[Dict]:
