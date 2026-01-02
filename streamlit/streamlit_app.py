@@ -932,19 +932,69 @@ with tab_batch:
         st.caption(f"Cache: {backend} (shared) | Total cached for these filters: {total_checked}")
 
     # Run button and controls
-    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
+    col1, col2, col3, col4, col5 = st.columns([1.2, 1.2, 0.8, 0.8, 1])
 
     with col1:
-        run_batch = st.button("Run Batch Analysis", type="primary", use_container_width=True)
+        run_batch = st.button("Run Now", type="primary", use_container_width=True,
+                              help="Run in browser (stops if you close tab)")
 
     with col2:
-        stop_batch = st.button("Stop", use_container_width=True)
+        run_background = st.button("Run in Background", type="secondary", use_container_width=True,
+                                   help="Queue job - continues even if you close browser")
 
     with col3:
-        if st.button("Clear Cache", type="secondary", use_container_width=True):
+        stop_batch = st.button("Stop", use_container_width=True)
+
+    with col4:
+        if st.button("Clear Cache", use_container_width=True):
             db_storage.clear_all_checked_tickers()
             st.success("Cache cleared!")
             st.rerun()
+
+    # Handle background job creation
+    if run_background:
+        if "SQLite" in backend:
+            st.error("Background jobs require cloud storage (Supabase). Configure in Settings.")
+        elif "Roic" in data_source and not api_key:
+            st.error("Please enter your Roic.ai API key in Settings tab")
+        else:
+            job_id = db_storage.create_batch_job(batch_filters, job_name=f"Batch {datetime.now().strftime('%m/%d %H:%M')}")
+            if job_id:
+                st.success(f"Background job created: **{job_id}**")
+                st.info("Job will be processed by GitHub Actions (runs every 15 min). Check status below.")
+            else:
+                st.error("Failed to create background job")
+
+    # Show recent background jobs
+    if db_storage.USE_SUPABASE:
+        recent_jobs = db_storage.get_recent_batch_jobs(limit=5)
+        if recent_jobs:
+            with st.expander(f"Background Jobs ({len(recent_jobs)} recent)", expanded=False):
+                for job in recent_jobs:
+                    status_icon = {
+                        'pending': '⏳',
+                        'running': '🔄',
+                        'completed': '✅',
+                        'failed': '❌'
+                    }.get(job['status'], '❓')
+
+                    progress_pct = 0
+                    if job['total_tickers'] > 0:
+                        progress_pct = job['processed_tickers'] / job['total_tickers'] * 100
+
+                    col_j1, col_j2, col_j3 = st.columns([2, 1, 1])
+                    with col_j1:
+                        st.write(f"{status_icon} **{job['job_id']}** - {job.get('job_name', 'Unnamed')}")
+                    with col_j2:
+                        if job['status'] == 'running':
+                            st.write(f"{progress_pct:.0f}% ({job['processed_tickers']}/{job['total_tickers']})")
+                        elif job['status'] == 'completed':
+                            st.write(f"✅ {job['matched_tickers']} matched")
+                        else:
+                            st.write(job['status'])
+                    with col_j3:
+                        created = job.get('created_at', '')[:16].replace('T', ' ')
+                        st.caption(created)
 
     # Batch execution
     if run_batch:

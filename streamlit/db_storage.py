@@ -626,3 +626,152 @@ def clear_all_checked_tickers():
         conn.commit()
         conn.close()
         print("Cleared all checked tickers from SQLite")
+
+
+# ==================== BATCH JOB TRACKING ====================
+# For background processing that continues even when UI disconnects
+
+def create_batch_job(filters: Dict, job_name: str = None) -> Optional[str]:
+    """
+    Create a new batch screening job. Returns job_id.
+    Job state is stored in Supabase so a separate worker can process it.
+    """
+    if not USE_SUPABASE:
+        print("Batch jobs require Supabase - not available locally")
+        return None
+
+    try:
+        import uuid
+        client = _get_supabase()
+        job_id = str(uuid.uuid4())[:8]
+        filter_hash = _get_filter_hash(filters)
+
+        data = {
+            'job_id': job_id,
+            'job_name': job_name or f"Batch {job_id}",
+            'filters_json': json.dumps(filters),
+            'filter_hash': filter_hash,
+            'status': 'pending',  # pending, running, completed, failed
+            'total_tickers': 0,
+            'processed_tickers': 0,
+            'matched_tickers': 0,
+            'current_ticker': None,
+            'created_at': datetime.now().isoformat(),
+            'started_at': None,
+            'completed_at': None,
+            'error_message': None,
+        }
+
+        response = client.table('batch_jobs').insert(data).execute()
+        if response.data:
+            print(f"Created batch job: {job_id}")
+            return job_id
+        return None
+    except Exception as e:
+        print(f"Error creating batch job: {e}")
+        return None
+
+
+def get_batch_job(job_id: str) -> Optional[Dict]:
+    """Get batch job status and details"""
+    if not USE_SUPABASE:
+        return None
+
+    try:
+        client = _get_supabase()
+        response = client.table('batch_jobs') \
+            .select('*') \
+            .eq('job_id', job_id) \
+            .execute()
+
+        if response.data and len(response.data) > 0:
+            job = response.data[0]
+            # Parse filters back from JSON
+            if job.get('filters_json'):
+                job['filters'] = json.loads(job['filters_json'])
+            return job
+        return None
+    except Exception as e:
+        print(f"Error getting batch job: {e}")
+        return None
+
+
+def get_pending_batch_jobs() -> List[Dict]:
+    """Get all pending or running batch jobs (for worker to process)"""
+    if not USE_SUPABASE:
+        return []
+
+    try:
+        client = _get_supabase()
+        response = client.table('batch_jobs') \
+            .select('*') \
+            .in_('status', ['pending', 'running']) \
+            .order('created_at', desc=False) \
+            .execute()
+
+        jobs = []
+        for job in response.data:
+            if job.get('filters_json'):
+                job['filters'] = json.loads(job['filters_json'])
+            jobs.append(job)
+        return jobs
+    except Exception as e:
+        print(f"Error getting pending jobs: {e}")
+        return []
+
+
+def update_batch_job(job_id: str, **kwargs):
+    """Update batch job status/progress"""
+    if not USE_SUPABASE:
+        return
+
+    try:
+        client = _get_supabase()
+
+        # Build update dict from kwargs
+        data = {}
+        for key in ['status', 'total_tickers', 'processed_tickers', 'matched_tickers',
+                    'current_ticker', 'started_at', 'completed_at', 'error_message']:
+            if key in kwargs:
+                data[key] = kwargs[key]
+
+        if data:
+            client.table('batch_jobs').update(data).eq('job_id', job_id).execute()
+    except Exception as e:
+        print(f"Error updating batch job: {e}")
+
+
+def get_recent_batch_jobs(limit: int = 10) -> List[Dict]:
+    """Get recent batch jobs for display"""
+    if not USE_SUPABASE:
+        return []
+
+    try:
+        client = _get_supabase()
+        response = client.table('batch_jobs') \
+            .select('*') \
+            .order('created_at', desc=True) \
+            .limit(limit) \
+            .execute()
+
+        jobs = []
+        for job in response.data:
+            if job.get('filters_json'):
+                job['filters'] = json.loads(job['filters_json'])
+            jobs.append(job)
+        return jobs
+    except Exception as e:
+        print(f"Error getting recent jobs: {e}")
+        return []
+
+
+def delete_batch_job(job_id: str):
+    """Delete a batch job"""
+    if not USE_SUPABASE:
+        return
+
+    try:
+        client = _get_supabase()
+        client.table('batch_jobs').delete().eq('job_id', job_id).execute()
+    except Exception as e:
+        print(f"Error deleting batch job: {e}")
