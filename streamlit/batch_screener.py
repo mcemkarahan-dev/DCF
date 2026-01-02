@@ -1023,8 +1023,8 @@ class BatchScreener:
                 else:
                     stock['metrics'] = metrics
 
-            # Record that this ticker was checked (if it required slow operations)
-            if required_slow_check and checked_callback:
+            # Record that this ticker was checked (always, so we skip it next time)
+            if checked_callback:
                 checked_callback(stock['ticker'], passed_all)
 
             # Skip if didn't pass all filters

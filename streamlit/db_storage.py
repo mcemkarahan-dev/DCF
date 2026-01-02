@@ -539,10 +539,13 @@ def was_recently_checked(ticker: str, filters: Dict, days: int = 7) -> bool:
 def get_recently_checked_tickers(filters: Dict, days: int = 7) -> set:
     """Get all tickers checked with same filters in last N days"""
     filter_hash = _get_filter_hash(filters)
+    print(f"DEBUG: Looking for recently checked tickers with filter_hash={filter_hash}")
     if USE_SUPABASE:
-        return _supabase_get_recently_checked_tickers(filter_hash, days)
+        result = _supabase_get_recently_checked_tickers(filter_hash, days)
     else:
-        return _sqlite_get_recently_checked_tickers(filter_hash, days)
+        result = _sqlite_get_recently_checked_tickers(filter_hash, days)
+    print(f"DEBUG: Found {len(result)} recently checked tickers")
+    return result
 
 
 def clear_old_checked_tickers(days: int = 30):

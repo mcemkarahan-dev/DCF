@@ -558,6 +558,9 @@ class RoicDataFetcher:
               f"(filtered: sector={filtered_out['sector']}, exchange={filtered_out['exchange']}, "
               f"market_cap={filtered_out['market_cap']})")
 
+        # Sort alphabetically by ticker for consistent ordering
+        results.sort(key=lambda x: x['ticker'])
+
         return results
     
     def calculate_fcf_from_statements(self, cash_flow: Dict) -> float:

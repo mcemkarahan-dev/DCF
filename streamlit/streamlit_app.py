@@ -943,6 +943,7 @@ with tab_batch:
             recently_checked = db_storage.get_recently_checked_tickers(batch_filters, days=7)
             if recently_checked:
                 skipped_recently_checked[0] = len(recently_checked)
+                print(f"DEBUG: Will skip {len(recently_checked)} recently checked tickers")
 
             try:
                 source = "roic" if "Roic" in data_source else "yahoo"
@@ -977,9 +978,12 @@ with tab_batch:
                     )
                     matched_display.success(f"**Matched Tickers:** {', '.join(matched_tickers)}")
 
+                saved_count = [0]  # Track successful saves
+
                 def on_checked(ticker: str, matched: bool):
                     """Save each checked ticker to avoid re-checking"""
                     db_storage.save_checked_ticker(ticker, batch_filters, matched)
+                    saved_count[0] += 1
 
                 # Combine all tickers to skip: recently checked + already in history
                 all_skip_tickers = recently_checked | existing_tickers
@@ -1022,10 +1026,14 @@ with tab_batch:
                         time.sleep(0.3)
 
                     progress_bar.progress(1.0)
-                    msg = f"Done! Analyzed {analyzed_count} new stocks. Check 'Analysis History' tab."
+                    # Show final cache status
+                    final_cache_count = db_storage.get_checked_tickers_count(batch_filters)
+                    msg = f"Done! Analyzed {analyzed_count} new stocks. Cached: {saved_count[0]} new, {final_cache_count} total. Check 'Analysis History' tab."
                     status_text.success(msg)
                 else:
-                    status_text.warning("No stocks matched the filter criteria.")
+                    # Still show cache update even if no matches
+                    final_cache_count = db_storage.get_checked_tickers_count(batch_filters)
+                    status_text.warning(f"No stocks matched. Cached: {saved_count[0]} new tickers, {final_cache_count} total for these filters.")
 
             except Exception as e:
                 st.error(f"Error: {str(e)}")
