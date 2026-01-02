@@ -458,30 +458,30 @@ def was_recently_analyzed(ticker, params, days=10):
 
 # ==================== HEADER ====================
 # Logo and branding in single HTML block for tight positioning
-# Oreo cookies logo
+# Oreo cookies logo - sketch style
 st.markdown('''
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700&display=swap');
 </style>
 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.5rem;">
     <svg viewBox="0 0 80 45" width="56" height="36" xmlns="http://www.w3.org/2000/svg">
-        <!-- Back cookie (tilted) -->
-        <ellipse cx="55" cy="18" rx="18" ry="7" fill="#1a1a1a" transform="rotate(-10 55 18)"/>
-        <ellipse cx="55" cy="16" rx="16" ry="5" fill="#f5f5f0" transform="rotate(-10 55 16)"/>
-        <ellipse cx="55" cy="14" rx="18" ry="7" fill="#1a1a1a" transform="rotate(-10 55 14)"/>
+        <!-- Back cookie (tilted) - sketch style with strokes -->
+        <ellipse cx="55" cy="18" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5" transform="rotate(-10 55 18)"/>
+        <ellipse cx="55" cy="16" rx="14" ry="4" fill="#f0f0f0" stroke="#777" stroke-width="1" transform="rotate(-10 55 16)"/>
+        <ellipse cx="55" cy="14" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5" transform="rotate(-10 55 14)"/>
         <!-- Middle cookie -->
-        <ellipse cx="38" cy="26" rx="18" ry="7" fill="#1a1a1a"/>
-        <ellipse cx="38" cy="24" rx="16" ry="5" fill="#f5f5f0"/>
-        <ellipse cx="38" cy="22" rx="18" ry="7" fill="#1a1a1a"/>
+        <ellipse cx="38" cy="26" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5"/>
+        <ellipse cx="38" cy="24" rx="14" ry="4" fill="#f0f0f0" stroke="#777" stroke-width="1"/>
+        <ellipse cx="38" cy="22" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5"/>
         <!-- Front cookie (tilted other way) -->
-        <ellipse cx="20" cy="34" rx="18" ry="7" fill="#1a1a1a" transform="rotate(8 20 34)"/>
-        <ellipse cx="20" cy="32" rx="16" ry="5" fill="#f5f5f0" transform="rotate(8 20 32)"/>
-        <ellipse cx="20" cy="30" rx="18" ry="7" fill="#1a1a1a" transform="rotate(8 20 30)"/>
+        <ellipse cx="20" cy="34" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5" transform="rotate(8 20 34)"/>
+        <ellipse cx="20" cy="32" rx="14" ry="4" fill="#f0f0f0" stroke="#777" stroke-width="1" transform="rotate(8 20 32)"/>
+        <ellipse cx="20" cy="30" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5" transform="rotate(8 20 30)"/>
         <!-- Crumbs -->
-        <circle cx="62" cy="40" r="1.5" fill="#1a1a1a"/>
-        <circle cx="67" cy="38" r="1" fill="#1a1a1a"/>
-        <circle cx="58" cy="42" r="1.2" fill="#1a1a1a"/>
-        <circle cx="70" cy="41" r="0.8" fill="#1a1a1a"/>
+        <circle cx="62" cy="40" r="1.5" fill="#777"/>
+        <circle cx="67" cy="38" r="1" fill="#888"/>
+        <circle cx="58" cy="42" r="1.2" fill="#777"/>
+        <circle cx="70" cy="41" r="0.8" fill="#999"/>
     </svg>
     <span style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 1.25rem; color: #1a73e8; letter-spacing: -0.5px;">Cem's DCF Screener</span>
 </div>
