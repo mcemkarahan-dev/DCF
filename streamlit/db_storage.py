@@ -424,10 +424,12 @@ def _supabase_get_recently_checked_tickers(filter_hash: int, days: int = 7) -> s
         client = _get_supabase()
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
 
+        # Supabase defaults to 1000 rows - override with higher limit
         response = client.table('checked_tickers') \
             .select('ticker') \
             .eq('filter_hash', filter_hash) \
             .gte('checked_at', cutoff) \
+            .limit(50000) \
             .execute()
 
         return set(row['ticker'] for row in response.data)
@@ -570,11 +572,12 @@ def get_checked_tickers_count(filters: Dict = None) -> int:
     if USE_SUPABASE:
         try:
             client = _get_supabase()
+            # Use count='exact' and select only id to get true count (not limited by default 1000)
             if filters:
                 filter_hash = _get_filter_hash(filters)
-                response = client.table('checked_tickers').select('ticker', count='exact').eq('filter_hash', filter_hash).execute()
+                response = client.table('checked_tickers').select('*', count='exact', head=True).eq('filter_hash', filter_hash).execute()
             else:
-                response = client.table('checked_tickers').select('ticker', count='exact').execute()
+                response = client.table('checked_tickers').select('*', count='exact', head=True).execute()
             return response.count if response.count else 0
         except Exception as e:
             print(f"Supabase checked count error: {e}")
