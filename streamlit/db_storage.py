@@ -431,20 +431,39 @@ def _supabase_get_recently_checked_tickers(filter_hash: int, days: int = 7) -> s
 
         print(f"DEBUG: Querying checked_tickers with filter_hash={filter_hash}, cutoff={cutoff}")
 
-        # Supabase defaults to 1000 rows - override with higher limit
-        response = client.table('checked_tickers') \
-            .select('ticker') \
-            .eq('filter_hash', filter_hash) \
-            .gte('checked_at', cutoff) \
-            .limit(50000) \
-            .execute()
+        # Use pagination to get ALL tickers (Supabase may have response limits)
+        all_tickers = set()
+        page_size = 1000
+        offset = 0
 
-        tickers = set(row['ticker'] for row in response.data)
-        print(f"DEBUG: Query returned {len(tickers)} tickers")
-        if tickers:
-            sample = sorted(list(tickers))[:10]
-            print(f"DEBUG: First 10 cached tickers: {sample}")
-        return tickers
+        while True:
+            response = client.table('checked_tickers') \
+                .select('ticker') \
+                .eq('filter_hash', filter_hash) \
+                .gte('checked_at', cutoff) \
+                .order('ticker') \
+                .range(offset, offset + page_size - 1) \
+                .execute()
+
+            if not response.data:
+                break
+
+            for row in response.data:
+                all_tickers.add(row['ticker'])
+
+            print(f"DEBUG: Page at offset {offset} returned {len(response.data)} tickers, total so far: {len(all_tickers)}")
+
+            if len(response.data) < page_size:
+                break  # Last page
+
+            offset += page_size
+
+        print(f"DEBUG: Total tickers retrieved: {len(all_tickers)}")
+        if all_tickers:
+            sorted_tickers = sorted(list(all_tickers))
+            print(f"DEBUG: First 10 cached: {sorted_tickers[:10]}")
+            print(f"DEBUG: Last 10 cached: {sorted_tickers[-10:]}")
+        return all_tickers
     except Exception as e:
         print(f"Supabase get recently checked error: {e}")
         import traceback
