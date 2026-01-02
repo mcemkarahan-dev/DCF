@@ -943,10 +943,17 @@ class BatchScreener:
         # Filter out excluded tickers upfront for efficiency
         if exclude_tickers:
             original_count = len(stocks)
+            print(f"DEBUG: Universe has {original_count} stocks, exclude_tickers has {len(exclude_tickers)} entries")
+            # Show first few tickers before and after filtering
+            first_before = [s['ticker'] for s in stocks[:5]]
+            print(f"DEBUG: First 5 universe tickers BEFORE filter: {first_before}")
+
             stocks = [s for s in stocks if s['ticker'] not in exclude_tickers]
             skipped = original_count - len(stocks)
-            if skipped > 0:
-                print(f"Skipped {skipped} recently checked tickers")
+
+            first_after = [s['ticker'] for s in stocks[:5]]
+            print(f"DEBUG: First 5 universe tickers AFTER filter: {first_after}")
+            print(f"DEBUG: Skipped {skipped} tickers that were in exclude_tickers")
 
         # print(f"DEBUG: Got {len(stocks)} stocks in universe")
 

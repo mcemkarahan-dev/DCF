@@ -378,7 +378,9 @@ def _get_filter_hash(filters: Dict) -> int:
     filter_str = json.dumps(filters, sort_keys=True)
     # Use MD5 for deterministic hash, convert to int (take first 8 bytes)
     hash_bytes = hashlib.md5(filter_str.encode()).digest()[:8]
-    return int.from_bytes(hash_bytes, byteorder='big', signed=True)
+    result = int.from_bytes(hash_bytes, byteorder='big', signed=True)
+    print(f"DEBUG _get_filter_hash: filters={filter_str[:100]}... -> hash={result}")
+    return result
 
 
 # Supabase implementation for checked tickers
@@ -392,11 +394,14 @@ def _supabase_save_checked_ticker(ticker: str, filter_hash: int, matched: bool):
             'matched': matched,
             'checked_at': datetime.now().isoformat(),
         }
-        client.table('checked_tickers').upsert(
+        response = client.table('checked_tickers').upsert(
             data, on_conflict='ticker,filter_hash'
         ).execute()
+        # Verify save worked
+        if not response.data:
+            print(f"WARNING: Save returned no data for {ticker}")
     except Exception as e:
-        print(f"Supabase save checked ticker error: {e}")
+        print(f"Supabase save checked ticker error for {ticker}: {e}")
 
 
 def _supabase_was_recently_checked(ticker: str, filter_hash: int, days: int = 7) -> bool:
@@ -424,6 +429,8 @@ def _supabase_get_recently_checked_tickers(filter_hash: int, days: int = 7) -> s
         client = _get_supabase()
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
 
+        print(f"DEBUG: Querying checked_tickers with filter_hash={filter_hash}, cutoff={cutoff}")
+
         # Supabase defaults to 1000 rows - override with higher limit
         response = client.table('checked_tickers') \
             .select('ticker') \
@@ -432,9 +439,16 @@ def _supabase_get_recently_checked_tickers(filter_hash: int, days: int = 7) -> s
             .limit(50000) \
             .execute()
 
-        return set(row['ticker'] for row in response.data)
+        tickers = set(row['ticker'] for row in response.data)
+        print(f"DEBUG: Query returned {len(tickers)} tickers")
+        if tickers:
+            sample = sorted(list(tickers))[:10]
+            print(f"DEBUG: First 10 cached tickers: {sample}")
+        return tickers
     except Exception as e:
         print(f"Supabase get recently checked error: {e}")
+        import traceback
+        traceback.print_exc()
         return set()
 
 
