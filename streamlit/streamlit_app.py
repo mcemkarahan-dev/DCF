@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import sys
 import os
+import json
 from datetime import datetime, timedelta
 import time
 
@@ -943,7 +944,20 @@ with tab_batch:
             recently_checked = db_storage.get_recently_checked_tickers(batch_filters, days=7)
             if recently_checked:
                 skipped_recently_checked[0] = len(recently_checked)
-                print(f"DEBUG: Will skip {len(recently_checked)} recently checked tickers")
+
+            # Show debug info in UI
+            import hashlib
+            filter_str = json.dumps(batch_filters, sort_keys=True)
+            hash_bytes = hashlib.md5(filter_str.encode()).digest()[:8]
+            filter_hash = int.from_bytes(hash_bytes, byteorder='big', signed=True)
+
+            with st.expander(f"🔍 Debug: Cache Status (hash: {filter_hash})", expanded=False):
+                st.code(f"Filter hash: {filter_hash}\nFilters: {filter_str[:200]}...")
+                st.write(f"**Recently checked tickers in DB:** {len(recently_checked)}")
+                if recently_checked:
+                    sample = sorted(list(recently_checked))[:20]
+                    st.write(f"**First 20 cached:** {', '.join(sample)}")
+                st.write(f"**Tickers in history:** {len(existing_tickers)}")
 
             try:
                 source = "roic" if "Roic" in data_source else "yahoo"
