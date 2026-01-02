@@ -465,25 +465,25 @@ st.markdown('''
 </style>
 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.5rem;">
     <svg viewBox="0 0 80 45" width="56" height="36" xmlns="http://www.w3.org/2000/svg">
-        <!-- Back cookie (tilted) - sketch style with strokes -->
-        <ellipse cx="55" cy="18" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5" transform="rotate(-10 55 18)"/>
-        <ellipse cx="55" cy="16" rx="14" ry="4" fill="#f0f0f0" stroke="#777" stroke-width="1" transform="rotate(-10 55 16)"/>
-        <ellipse cx="55" cy="14" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5" transform="rotate(-10 55 14)"/>
+        <!-- Back cookie (tilted) - dark solid -->
+        <ellipse cx="55" cy="18" rx="16" ry="6" fill="#1a1a1a" transform="rotate(-10 55 18)"/>
+        <ellipse cx="55" cy="16" rx="14" ry="4" fill="#f5f5f0" transform="rotate(-10 55 16)"/>
+        <ellipse cx="55" cy="14" rx="16" ry="6" fill="#1a1a1a" transform="rotate(-10 55 14)"/>
+        <!-- Neon swoosh - behind middle cookie, in front of back cookie -->
+        <path d="M -2 32 Q 40 12 82 22" fill="none" stroke="#ADFF2F" stroke-width="5" stroke-linecap="round"/>
         <!-- Middle cookie -->
-        <ellipse cx="38" cy="26" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5"/>
-        <ellipse cx="38" cy="24" rx="14" ry="4" fill="#f0f0f0" stroke="#777" stroke-width="1"/>
-        <ellipse cx="38" cy="22" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5"/>
+        <ellipse cx="38" cy="26" rx="16" ry="6" fill="#1a1a1a"/>
+        <ellipse cx="38" cy="24" rx="14" ry="4" fill="#f5f5f0"/>
+        <ellipse cx="38" cy="22" rx="16" ry="6" fill="#1a1a1a"/>
         <!-- Front cookie (tilted other way) -->
-        <ellipse cx="20" cy="34" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5" transform="rotate(8 20 34)"/>
-        <ellipse cx="20" cy="32" rx="14" ry="4" fill="#f0f0f0" stroke="#777" stroke-width="1" transform="rotate(8 20 32)"/>
-        <ellipse cx="20" cy="30" rx="16" ry="6" fill="none" stroke="#555" stroke-width="1.5" transform="rotate(8 20 30)"/>
-        <!-- Flash yellow swoosh arch across cookies -->
-        <path d="M 2 38 Q 40 8 78 28" fill="none" stroke="#FFD700" stroke-width="3" stroke-linecap="round"/>
+        <ellipse cx="20" cy="34" rx="16" ry="6" fill="#1a1a1a" transform="rotate(8 20 34)"/>
+        <ellipse cx="20" cy="32" rx="14" ry="4" fill="#f5f5f0" transform="rotate(8 20 32)"/>
+        <ellipse cx="20" cy="30" rx="16" ry="6" fill="#1a1a1a" transform="rotate(8 20 30)"/>
         <!-- Crumbs -->
-        <circle cx="62" cy="40" r="1.5" fill="#777"/>
-        <circle cx="67" cy="38" r="1" fill="#888"/>
-        <circle cx="58" cy="42" r="1.2" fill="#777"/>
-        <circle cx="70" cy="41" r="0.8" fill="#999"/>
+        <circle cx="62" cy="40" r="1.5" fill="#2a2a2a"/>
+        <circle cx="67" cy="38" r="1" fill="#333"/>
+        <circle cx="58" cy="42" r="1.2" fill="#2a2a2a"/>
+        <circle cx="70" cy="41" r="0.8" fill="#444"/>
     </svg>
     <span style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 1.25rem; color: #1a73e8; letter-spacing: -0.5px;">Cem's DCF Screener</span>
 </div>
