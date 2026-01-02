@@ -697,12 +697,19 @@ with tab_batch:
     all_caps = get_all_market_cap_universes()
 
     # Initialize filter states in session
-    if 'sel_exchanges' not in st.session_state:
-        st.session_state.sel_exchanges = []
-    if 'sel_sectors' not in st.session_state:
-        st.session_state.sel_sectors = []
-    if 'sel_caps' not in st.session_state:
-        st.session_state.sel_caps = []
+    # Initialize checkbox states for filters (use individual keys to avoid value/session_state conflict)
+    # Exchange checkboxes
+    for ex in all_exchanges:
+        if f"ex_{ex}" not in st.session_state:
+            st.session_state[f"ex_{ex}"] = False
+    # Sector checkboxes
+    for sec in all_sectors:
+        if f"sec_{sec}" not in st.session_state:
+            st.session_state[f"sec_{sec}"] = False
+    # Market cap checkboxes
+    for cap in all_caps:
+        if f"cap_{cap}" not in st.session_state:
+            st.session_state[f"cap_{cap}"] = False
 
     # ===== HORIZONTAL FILTER BAR (Google Flights Style) =====
 
@@ -738,7 +745,9 @@ with tab_batch:
 
     # Exchange Filter
     with filter_cols[0]:
-        ex_count = len(st.session_state.sel_exchanges)
+        # Count selected exchanges from individual checkbox states
+        sel_exchanges = [ex for ex in all_exchanges if st.session_state.get(f"ex_{ex}", False)]
+        ex_count = len(sel_exchanges)
         if ex_count == 0 or ex_count == len(all_exchanges):
             exchange_label = "Exchange"
         else:
@@ -746,76 +755,69 @@ with tab_batch:
 
         with st.expander(f"{exchange_label} ▾", expanded=False):
             # Select All checkbox with callback
+            all_selected = ex_count == len(all_exchanges)
             st.checkbox(
                 "Select all exchanges",
-                value=len(st.session_state.sel_exchanges) == len(all_exchanges),
+                value=all_selected,
                 key="select_all_exchanges",
                 on_change=on_select_all_exchanges
             )
 
             st.markdown("---")
 
-            # Individual checkboxes
-            new_exchanges = []
+            # Individual checkboxes - no value param, let session state control
             for ex in all_exchanges:
-                default_checked = ex in st.session_state.sel_exchanges
-                if st.checkbox(ex, value=default_checked, key=f"ex_{ex}"):
-                    new_exchanges.append(ex)
-
-            # Update session state
-            st.session_state.sel_exchanges = new_exchanges
+                st.checkbox(ex, key=f"ex_{ex}")
 
     # Sector Filter
     with filter_cols[1]:
-        sec_count = len(st.session_state.sel_sectors)
+        # Count selected sectors from individual checkbox states
+        sel_sectors = [sec for sec in all_sectors if st.session_state.get(f"sec_{sec}", False)]
+        sec_count = len(sel_sectors)
         if sec_count == 0 or sec_count == len(all_sectors):
             sector_label = "Sector"
         else:
             sector_label = f"Sector ({sec_count})"
 
         with st.expander(f"{sector_label} ▾", expanded=False):
+            all_selected = sec_count == len(all_sectors)
             st.checkbox(
                 "Select all sectors",
-                value=len(st.session_state.sel_sectors) == len(all_sectors),
+                value=all_selected,
                 key="select_all_sectors",
                 on_change=on_select_all_sectors
             )
 
             st.markdown("---")
 
-            new_sectors = []
+            # Individual checkboxes - no value param, let session state control
             for sec in all_sectors:
-                default_checked = sec in st.session_state.sel_sectors
-                if st.checkbox(sec, value=default_checked, key=f"sec_{sec}"):
-                    new_sectors.append(sec)
-
-            st.session_state.sel_sectors = new_sectors
+                st.checkbox(sec, key=f"sec_{sec}")
 
     # Market Cap Filter
     with filter_cols[2]:
-        cap_count = len(st.session_state.sel_caps)
+        # Count selected caps from individual checkbox states
+        sel_caps = [cap for cap in all_caps if st.session_state.get(f"cap_{cap}", False)]
+        cap_count = len(sel_caps)
         if cap_count == 0 or cap_count == len(all_caps):
             cap_label = "Market Cap"
         else:
             cap_label = f"Market Cap ({cap_count})"
 
         with st.expander(f"{cap_label} ▾", expanded=False):
+            all_selected = cap_count == len(all_caps)
             st.checkbox(
                 "Select all market caps",
-                value=len(st.session_state.sel_caps) == len(all_caps),
+                value=all_selected,
                 key="select_all_caps",
                 on_change=on_select_all_caps
             )
 
             st.markdown("---")
 
-            new_caps = []
+            # Individual checkboxes - no value param, let session state control
             for cap in all_caps:
-                default_checked = cap in st.session_state.sel_caps
-                if st.checkbox(cap, value=default_checked, key=f"cap_{cap}"):
-                    new_caps.append(cap)
-
-            st.session_state.sel_caps = new_caps
+                st.checkbox(cap, key=f"cap_{cap}")
 
     # Max Stocks
     with filter_cols[3]:
@@ -832,9 +834,13 @@ with tab_batch:
     with filter_cols[4]:
         st.markdown("<div style='height: 28px'></div>", unsafe_allow_html=True)
         if st.button("Reset", use_container_width=True):
-            st.session_state.sel_exchanges = []
-            st.session_state.sel_sectors = []
-            st.session_state.sel_caps = []
+            # Clear all individual checkbox states
+            for ex in all_exchanges:
+                st.session_state[f"ex_{ex}"] = False
+            for sec in all_sectors:
+                st.session_state[f"sec_{sec}"] = False
+            for cap in all_caps:
+                st.session_state[f"cap_{cap}"] = False
             st.rerun()
 
     # Advanced filters
@@ -871,11 +877,16 @@ with tab_batch:
                 "Min Gross Margin %", min_value=0.0, max_value=100.0, value=0.0, step=5.0
             )
 
+    # Compute selected filters from checkbox states
+    sel_exchanges = [ex for ex in all_exchanges if st.session_state.get(f"ex_{ex}", False)]
+    sel_sectors = [sec for sec in all_sectors if st.session_state.get(f"sec_{sec}", False)]
+    sel_caps = [cap for cap in all_caps if st.session_state.get(f"cap_{cap}", False)]
+
     # Build filters dict (empty list = all)
     batch_filters = {
-        'sector': st.session_state.sel_sectors,
-        'exchange': st.session_state.sel_exchanges,
-        'market_cap_universe': st.session_state.sel_caps,
+        'sector': sel_sectors,
+        'exchange': sel_exchanges,
+        'market_cap_universe': sel_caps,
         'positive_fcf_last_year': fcf_last_year,
         'positive_fcf_years_3': fcf_years_3,
         'positive_fcf_years_5': fcf_years_5,
@@ -885,12 +896,12 @@ with tab_batch:
 
     # Show active filters summary
     active_filters = []
-    if st.session_state.sel_exchanges:
-        active_filters.append(f"Exchanges: {', '.join(st.session_state.sel_exchanges)}")
-    if st.session_state.sel_sectors:
-        active_filters.append(f"Sectors: {', '.join(st.session_state.sel_sectors)}")
-    if st.session_state.sel_caps:
-        active_filters.append(f"Market Cap: {', '.join(st.session_state.sel_caps)}")
+    if sel_exchanges:
+        active_filters.append(f"Exchanges: {', '.join(sel_exchanges)}")
+    if sel_sectors:
+        active_filters.append(f"Sectors: {', '.join(sel_sectors)}")
+    if sel_caps:
+        active_filters.append(f"Market Cap: {', '.join(sel_caps)}")
 
     if active_filters:
         st.caption("Active: " + " | ".join(active_filters))
