@@ -26,6 +26,47 @@ def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
 
 
+def normalize_ticker(ticker: str) -> str:
+    """
+    Normalize ticker to our standard format (using '.' as separator).
+    Different platforms use different conventions:
+    - Yahoo Finance: BRK-B, BF-B
+    - Google Finance: BRK.B, BF.B
+    - ROIC.AI: varies
+    We standardize on '.' as the separator.
+    """
+    # Replace common separators with '.'
+    normalized = ticker.replace('-', '.').replace('/', '.').replace(' ', '.')
+    return normalized.upper()
+
+
+def ticker_variants(ticker: str) -> list:
+    """
+    Generate ticker variants to try across different APIs.
+    Returns list of possible ticker formats to try.
+    """
+    base = ticker.upper()
+    variants = [base]
+
+    # If has '.', also try '-' variant (for Yahoo)
+    if '.' in base:
+        variants.append(base.replace('.', '-'))
+
+    # If has '-', also try '.' variant
+    if '-' in base:
+        variants.append(base.replace('-', '.'))
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique = []
+    for v in variants:
+        if v not in seen:
+            seen.add(v)
+            unique.append(v)
+
+    return unique
+
+
 def load_secrets():
     """Load secrets from .streamlit/secrets.toml"""
     secrets_path = os.path.join(SCRIPT_DIR, '.streamlit', 'secrets.toml')
@@ -41,45 +82,57 @@ def load_secrets():
 
 
 def get_from_yahoo(ticker: str) -> Optional[Dict]:
-    """Fetch sector and market cap from Yahoo Finance"""
-    try:
-        import yfinance as yf
-        yf_ticker = yf.Ticker(ticker)
-        info = yf_ticker.info
+    """Fetch sector and market cap from Yahoo Finance. Tries ticker variants."""
+    import yfinance as yf
 
-        if not info or info.get('regularMarketPrice') is None:
-            return None
+    # Try different ticker formats (Yahoo uses '-' for class shares)
+    for variant in ticker_variants(ticker):
+        try:
+            yf_ticker = yf.Ticker(variant)
+            info = yf_ticker.info
 
-        return {
-            'sector': info.get('sector', 'N/A'),
-            'market_cap': info.get('marketCap', 0) or 0
-        }
-    except Exception as e:
-        return None
+            if info and info.get('regularMarketPrice') is not None:
+                sector = info.get('sector', 'N/A')
+                if sector and sector != 'N/A':
+                    return {
+                        'sector': sector,
+                        'market_cap': info.get('marketCap', 0) or 0
+                    }
+        except Exception:
+            continue
+
+    return None
 
 
 def get_from_roic(ticker: str, api_key: str) -> Optional[Dict]:
-    """Fetch sector and market cap from ROIC.AI company profile"""
-    try:
-        import requests
-        url = f"https://api.roic.ai/v2/company/profile/{ticker}?apikey={api_key}"
-        resp = requests.get(url, timeout=10)
+    """Fetch sector and market cap from ROIC.AI company profile. Tries ticker variants."""
+    import requests
 
-        if resp.status_code != 200:
-            return None
+    # Try different ticker formats
+    for variant in ticker_variants(ticker):
+        try:
+            url = f"https://api.roic.ai/v2/company/profile/{variant}?apikey={api_key}"
+            resp = requests.get(url, timeout=10)
 
-        data = resp.json()
-        if not data or len(data) == 0:
-            return None
+            if resp.status_code != 200:
+                continue
 
-        profile = data[0] if isinstance(data, list) else data
+            data = resp.json()
+            if not data or len(data) == 0:
+                continue
 
-        return {
-            'sector': profile.get('sector', 'N/A'),
-            'market_cap': profile.get('mktCap') or profile.get('marketCap') or 0
-        }
-    except Exception as e:
-        return None
+            profile = data[0] if isinstance(data, list) else data
+            sector = profile.get('sector', 'N/A')
+
+            if sector and sector != 'N/A':
+                return {
+                    'sector': sector,
+                    'market_cap': profile.get('mktCap') or profile.get('marketCap') or 0
+                }
+        except Exception:
+            continue
+
+    return None
 
 
 def get_market_cap_universe(mkt_cap: int) -> str:
@@ -120,7 +173,7 @@ def enrich_ticker(ticker: str, roic_key: str, use_roic: bool = True) -> Tuple[st
     return (ticker, result)
 
 
-def enrich_tickers(batch_size: int = 500, num_workers: int = 4, max_tickers: int = None):
+def enrich_tickers(batch_size: int = 500, num_workers: int = 4, max_tickers: int = None, us_only: bool = False):
     """Main enrichment function"""
 
     from supabase import create_client
@@ -144,24 +197,32 @@ def enrich_tickers(batch_size: int = 500, num_workers: int = 4, max_tickers: int
     offset = 0
     page_size = 1000
 
+    # US exchanges for filtering
+    us_exchanges = ['NYSE', 'NASDAQ', 'AMEX']
+
     while True:
-        response = supabase.table('tickers') \
-            .select('ticker') \
-            .eq('sector', 'N/A') \
-            .range(offset, offset + page_size - 1) \
-            .execute()
+        query = supabase.table('tickers') \
+            .select('ticker,exchange') \
+            .eq('sector', 'N/A')
+
+        response = query.range(offset, offset + page_size - 1).execute()
 
         batch = response.data if response.data else []
         if not batch:
             break
 
-        all_tickers.extend([t['ticker'] for t in batch])
+        # Filter for US exchanges if requested
+        for t in batch:
+            if us_only and t.get('exchange') not in us_exchanges:
+                continue
+            all_tickers.append(t['ticker'])
 
         if len(batch) < page_size:
             break
         offset += page_size
 
-    log(f"Found {len(all_tickers)} tickers needing enrichment")
+    filter_desc = "US exchanges only" if us_only else "all exchanges"
+    log(f"Found {len(all_tickers)} tickers needing enrichment ({filter_desc})")
 
     if max_tickers:
         all_tickers = all_tickers[:max_tickers]
@@ -251,13 +312,15 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=500, help='Batch size for processing')
     parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers')
     parser.add_argument('--max', type=int, default=None, help='Max tickers to process (for testing)')
+    parser.add_argument('--us-only', action='store_true', help='Only enrich US exchange tickers (NYSE, NASDAQ, AMEX)')
 
     args = parser.parse_args()
 
-    log(f"Starting enrichment with batch_size={args.batch_size}, workers={args.workers}")
+    log(f"Starting enrichment with batch_size={args.batch_size}, workers={args.workers}, us_only={args.us_only}")
     success = enrich_tickers(
         batch_size=args.batch_size,
         num_workers=args.workers,
-        max_tickers=args.max
+        max_tickers=args.max,
+        us_only=args.us_only
     )
     sys.exit(0 if success else 1)
