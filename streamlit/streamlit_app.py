@@ -964,18 +964,18 @@ with tab_screen:
             label_visibility="visible"
         )
 
-    # Reset button
+    # Reset button callback (must run before widgets render)
+    def reset_all_filters():
+        for ex in all_exchanges:
+            st.session_state[f"ex_{ex}"] = False
+        for sec in all_sectors:
+            st.session_state[f"sec_{sec}"] = False
+        for cap in all_caps:
+            st.session_state[f"cap_{cap}"] = False
+
     with filter_cols[4]:
         st.markdown("<div style='height: 28px'></div>", unsafe_allow_html=True)
-        if st.button("Reset", use_container_width=True):
-            # Clear all individual checkbox states
-            for ex in all_exchanges:
-                st.session_state[f"ex_{ex}"] = False
-            for sec in all_sectors:
-                st.session_state[f"sec_{sec}"] = False
-            for cap in all_caps:
-                st.session_state[f"cap_{cap}"] = False
-            st.rerun()
+        st.button("Reset", use_container_width=True, on_click=reset_all_filters)
 
     # Advanced filters
     with st.expander("Advanced Filters ▾"):
