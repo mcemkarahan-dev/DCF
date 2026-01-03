@@ -227,10 +227,34 @@ class BatchScreener:
         Get the universe of stocks to screen.
         Returns list of dicts with basic info: ticker, name, sector, exchange, market_cap
 
+        NEW: First tries Supabase tickers table (instant), falls back to API if needed.
+
         Args:
             exchange: Optional exchange filter (legacy)
             filters: Dict of filter values for server-side filtering (sector, exchange, market_cap_universe)
         """
+        # NEW: Try Supabase tickers table first (instant query)
+        import db_storage
+        if db_storage.USE_SUPABASE:
+            sectors = filters.get('sector', []) if filters else []
+            exchanges = filters.get('exchange', []) if filters else []
+            if exchange and not exchanges:
+                exchanges = [exchange]
+            market_caps = filters.get('market_cap_universe', []) if filters else []
+
+            tickers = db_storage.get_filtered_tickers(
+                sectors=sectors if sectors else None,
+                exchanges=exchanges if exchanges else None,
+                market_caps=market_caps if market_caps else None
+            )
+
+            if tickers and len(tickers) > 0:
+                print(f"Got {len(tickers)} tickers from Supabase tickers table (instant)")
+                return tickers
+            else:
+                print("Supabase tickers table empty, falling back to API...")
+
+        # Fallback to API if Supabase not available or table empty
         if self.data_source == "roic":
             return self._get_roic_universe(exchange, filters)
         else:

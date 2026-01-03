@@ -645,3 +645,281 @@ def clear_all_checked_tickers():
         conn.commit()
         conn.close()
         print("Cleared all checked tickers from SQLite")
+
+
+# ==================== TICKERS TABLE (NEW) ====================
+# Pre-populated universe of stocks for fast filtering
+
+def get_filtered_tickers(
+    sectors: List[str] = None,
+    exchanges: List[str] = None,
+    market_caps: List[str] = None,
+    limit: int = None
+) -> List[Dict]:
+    """
+    Query the tickers table with filters.
+    Returns list of ticker dicts matching the criteria.
+    This is FAST - just a database query, no API calls.
+    """
+    if not USE_SUPABASE:
+        print("ERROR: Tickers table requires Supabase")
+        return []
+
+    try:
+        client = _get_supabase()
+
+        # Start query
+        query = client.table('tickers').select('*')
+
+        # Apply filters (empty list = no filter = all)
+        if sectors and len(sectors) > 0:
+            query = query.in_('sector', sectors)
+
+        if exchanges and len(exchanges) > 0:
+            query = query.in_('exchange', exchanges)
+
+        if market_caps and len(market_caps) > 0:
+            query = query.in_('market_cap_universe', market_caps)
+
+        # Order by ticker for consistency
+        query = query.order('ticker')
+
+        # Apply limit if specified
+        if limit:
+            query = query.limit(limit)
+
+        response = query.execute()
+
+        tickers = response.data if response.data else []
+        print(f"get_filtered_tickers: returned {len(tickers)} tickers")
+        return tickers
+
+    except Exception as e:
+        print(f"Error querying tickers table: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+
+def get_tickers_count(
+    sectors: List[str] = None,
+    exchanges: List[str] = None,
+    market_caps: List[str] = None
+) -> int:
+    """Get count of tickers matching filters"""
+    if not USE_SUPABASE:
+        return 0
+
+    try:
+        client = _get_supabase()
+        query = client.table('tickers').select('*', count='exact', head=True)
+
+        if sectors and len(sectors) > 0:
+            query = query.in_('sector', sectors)
+        if exchanges and len(exchanges) > 0:
+            query = query.in_('exchange', exchanges)
+        if market_caps and len(market_caps) > 0:
+            query = query.in_('market_cap_universe', market_caps)
+
+        response = query.execute()
+        return response.count if response.count else 0
+
+    except Exception as e:
+        print(f"Error counting tickers: {e}")
+        return 0
+
+
+def get_all_sectors() -> List[str]:
+    """Get list of unique sectors from tickers table"""
+    if not USE_SUPABASE:
+        return []
+
+    try:
+        client = _get_supabase()
+        # Get distinct sectors
+        response = client.table('tickers').select('sector').execute()
+        sectors = set(row['sector'] for row in response.data if row.get('sector'))
+        return sorted(list(sectors))
+    except Exception as e:
+        print(f"Error getting sectors: {e}")
+        return []
+
+
+def get_all_exchanges() -> List[str]:
+    """Get list of unique exchanges from tickers table"""
+    if not USE_SUPABASE:
+        return []
+
+    try:
+        client = _get_supabase()
+        response = client.table('tickers').select('exchange').execute()
+        exchanges = set(row['exchange'] for row in response.data if row.get('exchange'))
+        return sorted(list(exchanges))
+    except Exception as e:
+        print(f"Error getting exchanges: {e}")
+        return []
+
+
+def get_all_market_caps() -> List[str]:
+    """Get list of unique market cap universes from tickers table"""
+    if not USE_SUPABASE:
+        return []
+
+    try:
+        client = _get_supabase()
+        response = client.table('tickers').select('market_cap_universe').execute()
+        caps = set(row['market_cap_universe'] for row in response.data if row.get('market_cap_universe'))
+        # Return in logical order
+        order = ['Mega Cap', 'Large Cap', 'Mid Cap', 'Small Cap', 'Micro Cap']
+        return [c for c in order if c in caps] + [c for c in sorted(caps) if c not in order]
+    except Exception as e:
+        print(f"Error getting market caps: {e}")
+        return []
+
+
+# ==================== USER CONFIGURATIONS (NEW) ====================
+# Unified settings: DCF params + Filters in one config
+
+DEFAULT_USER_ID = "default"  # Temporary until we have auth
+
+def save_user_config(config_name: str, config_data: Dict, user_id: str = None, is_default: bool = False) -> bool:
+    """
+    Save a user configuration (DCF params + filters).
+    config_data should have: { dcf_params: {...}, filters: {...} }
+    """
+    if not USE_SUPABASE:
+        print("ERROR: User configs require Supabase")
+        return False
+
+    user_id = user_id or DEFAULT_USER_ID
+
+    try:
+        client = _get_supabase()
+
+        # If setting as default, clear other defaults for this user
+        if is_default:
+            client.table('user_configurations') \
+                .update({'is_default': False}) \
+                .eq('user_id', user_id) \
+                .execute()
+
+        data = {
+            'user_id': user_id,
+            'config_name': config_name,
+            'config_json': json.dumps(config_data),
+            'is_default': is_default,
+            'updated_at': datetime.now().isoformat()
+        }
+
+        response = client.table('user_configurations').upsert(
+            data,
+            on_conflict='user_id,config_name'
+        ).execute()
+
+        print(f"Saved config '{config_name}' for user {user_id}")
+        return True
+
+    except Exception as e:
+        print(f"Error saving user config: {e}")
+        return False
+
+
+def load_user_config(config_name: str, user_id: str = None) -> Optional[Dict]:
+    """Load a specific user configuration by name"""
+    if not USE_SUPABASE:
+        return None
+
+    user_id = user_id or DEFAULT_USER_ID
+
+    try:
+        client = _get_supabase()
+        response = client.table('user_configurations') \
+            .select('*') \
+            .eq('user_id', user_id) \
+            .eq('config_name', config_name) \
+            .execute()
+
+        if response.data and len(response.data) > 0:
+            row = response.data[0]
+            config = json.loads(row['config_json'])
+            config['_name'] = row['config_name']
+            config['_is_default'] = row['is_default']
+            return config
+        return None
+
+    except Exception as e:
+        print(f"Error loading user config: {e}")
+        return None
+
+
+def load_default_config(user_id: str = None) -> Optional[Dict]:
+    """Load the user's default configuration"""
+    if not USE_SUPABASE:
+        return None
+
+    user_id = user_id or DEFAULT_USER_ID
+
+    try:
+        client = _get_supabase()
+        response = client.table('user_configurations') \
+            .select('*') \
+            .eq('user_id', user_id) \
+            .eq('is_default', True) \
+            .execute()
+
+        if response.data and len(response.data) > 0:
+            row = response.data[0]
+            config = json.loads(row['config_json'])
+            config['_name'] = row['config_name']
+            config['_is_default'] = True
+            return config
+        return None
+
+    except Exception as e:
+        print(f"Error loading default config: {e}")
+        return None
+
+
+def list_user_configs(user_id: str = None) -> List[Dict]:
+    """List all configurations for a user"""
+    if not USE_SUPABASE:
+        return []
+
+    user_id = user_id or DEFAULT_USER_ID
+
+    try:
+        client = _get_supabase()
+        response = client.table('user_configurations') \
+            .select('config_name, is_default, created_at, updated_at') \
+            .eq('user_id', user_id) \
+            .order('config_name') \
+            .execute()
+
+        return response.data if response.data else []
+
+    except Exception as e:
+        print(f"Error listing user configs: {e}")
+        return []
+
+
+def delete_user_config(config_name: str, user_id: str = None) -> bool:
+    """Delete a user configuration"""
+    if not USE_SUPABASE:
+        return False
+
+    user_id = user_id or DEFAULT_USER_ID
+
+    try:
+        client = _get_supabase()
+        client.table('user_configurations') \
+            .delete() \
+            .eq('user_id', user_id) \
+            .eq('config_name', config_name) \
+            .execute()
+
+        print(f"Deleted config '{config_name}' for user {user_id}")
+        return True
+
+    except Exception as e:
+        print(f"Error deleting user config: {e}")
+        return False
