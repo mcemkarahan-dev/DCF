@@ -4,20 +4,15 @@
     workflow_dispatch:
       inputs:
         us_only:
-          description: 'Only US exchanges (NYSE, NASDAQ, AMEX)'
+          description: Only US exchanges
           required: true
-          default: 'true'
+          default: true
           type: boolean
-        max_tickers:
-          description: 'Max tickers to process (leave empty for all)'
-          required: false
-          default: ''
-          type: string
         batch_size:
-          description: 'Batch size'
+          description: Batch size
           required: false
-          default: '500'
-          type: string
+          default: 500
+          type: number
 
   jobs:
     enrich:
@@ -29,25 +24,23 @@
 
         - uses: actions/setup-python@v5
           with:
-            python-version: '3.11'
+            python-version: 3.11
 
         - name: Install dependencies
           run: pip install supabase yfinance requests
 
-        - name: Create secrets file
+        - name: Create secrets
           run: |
             mkdir -p streamlit/.streamlit
-            cat > streamlit/.streamlit/secrets.toml << 'EOF'
-            SUPABASE_URL = "${{ secrets.SUPABASE_URL }}"
-            SUPABASE_KEY = "${{ secrets.SUPABASE_KEY }}"
-            ROIC_API_KEY = "${{ secrets.ROIC_API_KEY }}"
-            EOF
+            echo "SUPABASE_URL = \"${{ secrets.SUPABASE_URL }}\"" > streamlit/.streamlit/secrets.toml
+            echo "SUPABASE_KEY = \"${{ secrets.SUPABASE_KEY }}\"" >> streamlit/.streamlit/secrets.toml
+            echo "ROIC_API_KEY = \"${{ secrets.ROIC_API_KEY }}\"" >> streamlit/.streamlit/secrets.toml
 
         - name: Run enrichment
           run: |
             cd streamlit
-            CMD="python enrich_tickers.py --batch-size ${{ github.event.inputs.batch_size }} --workers 4"
-            if [ "${{ github.event.inputs.us_only }}" = "true" ]; then CMD="$CMD --us-only"; fi
-            if [ -n "${{ github.event.inputs.max_tickers }}" ]; then CMD="$CMD --max ${{ github.event.inputs.max_tickers }}"; fi
-            echo "Running: $CMD"
-            $CMD
+            if [ "${{ github.event.inputs.us_only }}" = "true" ]; then
+              python enrich_tickers.py --batch-size ${{ github.event.inputs.batch_size }} --workers 4 --us-only
+            else
+              python enrich_tickers.py --batch-size ${{ github.event.inputs.batch_size }} --workers 4
+            fi
