@@ -600,6 +600,17 @@ with tab_screen:
     all_sectors = get_all_sectors()
     all_caps = get_all_market_cap_universes()
 
+    # Initialize filter states FIRST (before config loading can reference them)
+    for ex in all_exchanges:
+        if f"ex_{ex}" not in st.session_state:
+            st.session_state[f"ex_{ex}"] = False
+    for sec in all_sectors:
+        if f"sec_{sec}" not in st.session_state:
+            st.session_state[f"sec_{sec}"] = False
+    for cap in all_caps:
+        if f"cap_{cap}" not in st.session_state:
+            st.session_state[f"cap_{cap}"] = False
+
     # ===== UNIFIED CONFIGURATION PANEL =====
     st.markdown("##### Configuration")
 
@@ -649,14 +660,11 @@ with tab_screen:
                         st.session_state[f"cap_{cap}"] = False
                     # Set selected ones
                     for ex in filters.get('exchanges', []):
-                        if f"ex_{ex}" in st.session_state:
-                            st.session_state[f"ex_{ex}"] = True
+                        st.session_state[f"ex_{ex}"] = True
                     for sec in filters.get('sectors', []):
-                        if f"sec_{sec}" in st.session_state:
-                            st.session_state[f"sec_{sec}"] = True
+                        st.session_state[f"sec_{sec}"] = True
                     for cap in filters.get('market_caps', []):
-                        if f"cap_{cap}" in st.session_state:
-                            st.session_state[f"cap_{cap}"] = True
+                        st.session_state[f"cap_{cap}"] = True
                 st.session_state['last_loaded_config'] = selected_config
                 st.rerun()
 
@@ -835,20 +843,7 @@ with tab_screen:
     st.markdown("---")
     st.markdown("##### Screening Filters")
 
-    # Initialize filter states in session
-    # Initialize checkbox states for filters (use individual keys to avoid value/session_state conflict)
-    # Exchange checkboxes
-    for ex in all_exchanges:
-        if f"ex_{ex}" not in st.session_state:
-            st.session_state[f"ex_{ex}"] = False
-    # Sector checkboxes
-    for sec in all_sectors:
-        if f"sec_{sec}" not in st.session_state:
-            st.session_state[f"sec_{sec}"] = False
-    # Market cap checkboxes
-    for cap in all_caps:
-        if f"cap_{cap}" not in st.session_state:
-            st.session_state[f"cap_{cap}"] = False
+    # Filter states already initialized at top of tab_screen
 
     # ===== HORIZONTAL FILTER BAR (Google Flights Style) =====
 
