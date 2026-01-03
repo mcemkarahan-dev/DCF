@@ -1,46 +1,44 @@
- name: Enrich Tickers
-
+name: Enrich Tickers
   on:
     workflow_dispatch:
       inputs:
         us_only:
-          description: Only US exchanges
+          description: 'Only US exchanges'
           required: true
-          default: true
+          default: 'true'
           type: boolean
-        batch_size:
-          description: Batch size
+        max_tickers:
+          description: 'Max tickers (empty for all)'
           required: false
-          default: 500
-          type: number
-
+          default: ''
+          type: string
+        batch_size:
+          description: 'Batch size'
+          required: false
+          default: '500'
+          type: string
   jobs:
     enrich:
       runs-on: ubuntu-latest
       timeout-minutes: 360
-
       steps:
         - uses: actions/checkout@v4
-
         - uses: actions/setup-python@v5
           with:
-            python-version: 3.11
-
+            python-version: '3.11'
         - name: Install dependencies
           run: pip install supabase yfinance requests
-
-        - name: Create secrets
+        - name: Create secrets file
           run: |
             mkdir -p streamlit/.streamlit
-            echo "SUPABASE_URL = \"${{ secrets.SUPABASE_URL }}\"" > streamlit/.streamlit/secrets.toml
-            echo "SUPABASE_KEY = \"${{ secrets.SUPABASE_KEY }}\"" >> streamlit/.streamlit/secrets.toml
-            echo "ROIC_API_KEY = \"${{ secrets.ROIC_API_KEY }}\"" >> streamlit/.streamlit/secrets.toml
-
+            echo 'SUPABASE_URL = "${{ secrets.SUPABASE_URL }}"' > streamlit/.streamlit/secrets.toml
+            echo 'SUPABASE_KEY = "${{ secrets.SUPABASE_KEY }}"' >> streamlit/.streamlit/secrets.toml
+            echo 'ROIC_API_KEY = "${{ secrets.ROIC_API_KEY }}"' >> streamlit/.streamlit/secrets.toml
         - name: Run enrichment
           run: |
             cd streamlit
-            if [ "${{ github.event.inputs.us_only }}" = "true" ]; then
-              python enrich_tickers.py --batch-size ${{ github.event.inputs.batch_size }} --workers 4 --us-only
-            else
-              python enrich_tickers.py --batch-size ${{ github.event.inputs.batch_size }} --workers 4
-            fi
+            CMD="python enrich_tickers.py --batch-size ${{ github.event.inputs.batch_size }} --workers 4"
+            if [ "${{ github.event.inputs.us_only }}" = "true" ]; then CMD="$CMD --us-only"; fi
+            if [ -n "${{ github.event.inputs.max_tickers }}" ]; then CMD="$CMD --max ${{ github.event.inputs.max_tickers }}"; fi
+            echo "Running: $CMD"
+            $CMD
