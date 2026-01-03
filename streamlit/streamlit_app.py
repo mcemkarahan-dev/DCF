@@ -603,8 +603,19 @@ with tab_screen:
     # ===== UNIFIED CONFIGURATION PANEL =====
     st.markdown("##### Configuration")
 
+    # Helper to sync DCF params to widget keys
+    def sync_params_to_widgets(params):
+        """Update widget session state keys from params dict"""
+        st.session_state['param_wacc'] = float(params.get('wacc', 0.10) * 100)
+        st.session_state['param_terminal'] = float(params.get('terminal_growth_rate', 0.02) * 100)
+        st.session_state['param_fcf_growth'] = float(params.get('fcf_growth_rate', 0.05) * 100)
+        st.session_state['param_proj_years'] = int(params.get('projection_years', 5))
+        st.session_state['param_mos'] = float(params.get('conservative_adjustment', 0.0) * 100)
+        st.session_state['param_normalize'] = params.get('normalize_starting_value', True)
+        st.session_state['param_norm_years'] = int(params.get('normalization_years', 5))
+
     # Config management row
-    config_col1, config_col2, config_col3, config_col4 = st.columns([1.5, 1, 1, 1])
+    config_col1, config_col2, config_col3 = st.columns([2, 1, 1])
 
     with config_col1:
         # Load existing configs from Supabase
@@ -622,9 +633,10 @@ with tab_screen:
         if selected_config and selected_config != st.session_state.get('last_loaded_config', ''):
             loaded = db_storage.load_user_config(selected_config)
             if loaded:
-                # Update DCF params
+                # Update DCF params AND widget keys
                 if 'dcf_params' in loaded:
                     st.session_state.custom_params = loaded['dcf_params']
+                    sync_params_to_widgets(loaded['dcf_params'])
                 # Update filter checkboxes
                 if 'filters' in loaded:
                     filters = loaded['filters']
@@ -649,36 +661,36 @@ with tab_screen:
                 st.rerun()
 
     with config_col2:
-        new_config_name = st.text_input("Config Name", placeholder="My Config", key="new_config_name", label_visibility="collapsed")
+        # Save button with popover for config name
+        with st.popover("Save Config", use_container_width=True):
+            save_name = st.text_input("Configuration name:", placeholder="My Config", key="save_config_name")
+            if st.button("Save", type="primary", use_container_width=True):
+                if save_name:
+                    # Get current filter selections
+                    current_exchanges = [ex for ex in all_exchanges if st.session_state.get(f"ex_{ex}", False)]
+                    current_sectors = [sec for sec in all_sectors if st.session_state.get(f"sec_{sec}", False)]
+                    current_caps = [cap for cap in all_caps if st.session_state.get(f"cap_{cap}", False)]
+
+                    config_data = {
+                        'dcf_params': st.session_state.get('custom_params', PRESET_CONFIGS['conservative']),
+                        'filters': {
+                            'exchanges': current_exchanges,
+                            'sectors': current_sectors,
+                            'market_caps': current_caps
+                        }
+                    }
+
+                    if db_storage.save_user_config(save_name, config_data):
+                        st.success(f"Saved!")
+                        st.session_state['last_loaded_config'] = ''
+                        st.rerun()
+                    else:
+                        st.error("Failed to save")
+                else:
+                    st.warning("Enter a name")
 
     with config_col3:
-        if st.button("Save Config", type="primary", use_container_width=True):
-            if new_config_name:
-                # Get current filter selections
-                current_exchanges = [ex for ex in all_exchanges if st.session_state.get(f"ex_{ex}", False)]
-                current_sectors = [sec for sec in all_sectors if st.session_state.get(f"sec_{sec}", False)]
-                current_caps = [cap for cap in all_caps if st.session_state.get(f"cap_{cap}", False)]
-
-                config_data = {
-                    'dcf_params': st.session_state.get('custom_params', PRESET_CONFIGS['conservative']),
-                    'filters': {
-                        'exchanges': current_exchanges,
-                        'sectors': current_sectors,
-                        'market_caps': current_caps
-                    }
-                }
-
-                if db_storage.save_user_config(new_config_name, config_data):
-                    st.success(f"Saved: {new_config_name}")
-                    st.session_state['last_loaded_config'] = ''
-                    st.rerun()
-                else:
-                    st.error("Failed to save config")
-            else:
-                st.warning("Enter a config name")
-
-    with config_col4:
-        if st.button("Delete Config", use_container_width=True):
+        if st.button("Delete", use_container_width=True):
             if selected_config:
                 if db_storage.delete_user_config(selected_config):
                     st.success(f"Deleted: {selected_config}")
@@ -686,6 +698,8 @@ with tab_screen:
                     st.rerun()
                 else:
                     st.error("Failed to delete")
+            else:
+                st.warning("Select a config first")
 
     # DCF Parameters in expander
     with st.expander("DCF Parameters", expanded=False):
@@ -704,7 +718,9 @@ with tab_screen:
 
             # Apply preset button
             if st.button("Apply Preset"):
-                st.session_state.custom_params = PRESET_CONFIGS[current_preset].copy()
+                preset_params = PRESET_CONFIGS[current_preset].copy()
+                st.session_state.custom_params = preset_params
+                sync_params_to_widgets(preset_params)
                 st.rerun()
 
         with api_col:
