@@ -606,6 +606,7 @@ def get_filtered_tickers(
     Query the tickers table with filters.
     Returns list of ticker dicts matching the criteria.
     This is FAST - just a database query, no API calls.
+    Uses pagination to fetch ALL matching tickers (Supabase defaults to 1000).
     """
     if not USE_SUPABASE:
         print("ERROR: Tickers table requires Supabase")
@@ -614,31 +615,51 @@ def get_filtered_tickers(
     try:
         client = _get_supabase()
 
-        # Start query
-        query = client.table('tickers').select('*')
+        all_tickers = []
+        batch_size = 1000
+        offset = 0
 
-        # Apply filters (empty list = no filter = all)
-        if sectors and len(sectors) > 0:
-            query = query.in_('sector', sectors)
+        while True:
+            # Build query with filters
+            query = client.table('tickers').select('*')
 
-        if exchanges and len(exchanges) > 0:
-            query = query.in_('exchange', exchanges)
+            # Apply filters (empty list = no filter = all)
+            if sectors and len(sectors) > 0:
+                query = query.in_('sector', sectors)
 
-        if market_caps and len(market_caps) > 0:
-            query = query.in_('market_cap_universe', market_caps)
+            if exchanges and len(exchanges) > 0:
+                query = query.in_('exchange', exchanges)
 
-        # Order by ticker for consistency
-        query = query.order('ticker')
+            if market_caps and len(market_caps) > 0:
+                query = query.in_('market_cap_universe', market_caps)
 
-        # Apply limit if specified
-        if limit:
-            query = query.limit(limit)
+            # Order by ticker for consistent pagination
+            query = query.order('ticker')
 
-        response = query.execute()
+            # Apply pagination
+            query = query.range(offset, offset + batch_size - 1)
 
-        tickers = response.data if response.data else []
-        print(f"get_filtered_tickers: returned {len(tickers)} tickers")
-        return tickers
+            response = query.execute()
+            batch = response.data if response.data else []
+
+            if not batch:
+                break
+
+            all_tickers.extend(batch)
+
+            # If user specified a limit and we've reached it, stop
+            if limit and len(all_tickers) >= limit:
+                all_tickers = all_tickers[:limit]
+                break
+
+            # If we got less than batch_size, we've fetched everything
+            if len(batch) < batch_size:
+                break
+
+            offset += batch_size
+
+        print(f"get_filtered_tickers: returned {len(all_tickers)} tickers (paginated)")
+        return all_tickers
 
     except Exception as e:
         print(f"Error querying tickers table: {e}")
