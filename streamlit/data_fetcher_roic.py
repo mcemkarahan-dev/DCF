@@ -391,8 +391,8 @@ class RoicDataFetcher:
     
     def get_exchange_tickers(self, exchange: str, limit: int = None) -> List[str]:
         """Get list of tickers for a specific exchange"""
-        # Roic has a tickers endpoint
-        endpoint = "tickers"
+        # Roic has a tickers/list endpoint
+        endpoint = "tickers/list"
 
         data = self._make_request(endpoint)
 
@@ -417,12 +417,12 @@ class RoicDataFetcher:
         Returns list of dicts with: symbol, name, sector, exchange, marketCap
         Used for dynamic batch screening.
         """
-        endpoint = "tickers"
+        endpoint = "tickers/list"
 
         data = self._make_request(endpoint)
 
         if not data:
-            print("Warning: ROIC.ai /tickers endpoint returned no data")
+            print("Warning: ROIC.ai /tickers/list endpoint returned no data")
             return []
 
         # Return full ticker data with all available fields
@@ -466,11 +466,11 @@ class RoicDataFetcher:
         Returns:
             List of ticker dicts matching the filters
         """
-        endpoint = "tickers"
+        endpoint = "tickers/list"
         data = self._make_request(endpoint)
 
         if not data:
-            print("Warning: ROIC.ai /tickers endpoint returned no data")
+            print("Warning: ROIC.ai /tickers/list endpoint returned no data")
             return []
 
         # Market cap thresholds for universe classification

@@ -481,75 +481,33 @@ def _supabase_clear_old_checked(days: int = 30):
         print(f"Supabase clear old checked error: {e}")
 
 
-# SQLite implementation for checked tickers
+# SQLite implementation for checked tickers - DEPRECATED
+# When Supabase is not configured, checked tickers are NOT cached locally
+# This ensures cloud-first architecture and no stale local data
+
 def _sqlite_init_checked_tickers_table():
-    """Initialize checked_tickers table in SQLite"""
-    conn = _sqlite_get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS checked_tickers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ticker TEXT NOT NULL,
-            filter_hash INTEGER NOT NULL,
-            matched INTEGER DEFAULT 0,
-            checked_at TEXT NOT NULL,
-            UNIQUE(ticker, filter_hash)
-        )
-    ''')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_checked_filter ON checked_tickers(filter_hash)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_checked_at ON checked_tickers(checked_at)')
-    conn.commit()
-    conn.close()
+    """No-op: checked_tickers not cached without Supabase"""
+    pass
 
 
 def _sqlite_save_checked_ticker(ticker: str, filter_hash: int, matched: bool):
-    """Save a checked ticker to SQLite"""
-    conn = _sqlite_get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT OR REPLACE INTO checked_tickers (ticker, filter_hash, matched, checked_at)
-        VALUES (?, ?, ?, ?)
-    ''', (ticker, filter_hash, 1 if matched else 0, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
+    """No-op: checked_tickers not cached without Supabase"""
+    pass
 
 
 def _sqlite_was_recently_checked(ticker: str, filter_hash: int, days: int = 7) -> bool:
-    """Check if ticker was checked with same filters in last N days"""
-    conn = _sqlite_get_connection()
-    cursor = conn.cursor()
-    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-    cursor.execute('''
-        SELECT 1 FROM checked_tickers
-        WHERE ticker = ? AND filter_hash = ? AND checked_at >= ?
-    ''', (ticker, filter_hash, cutoff))
-    row = cursor.fetchone()
-    conn.close()
-    return row is not None
+    """No-op: always return False without Supabase"""
+    return False
 
 
 def _sqlite_get_recently_checked_tickers(filter_hash: int, days: int = 7) -> set:
-    """Get all tickers checked with same filters in last N days"""
-    conn = _sqlite_get_connection()
-    cursor = conn.cursor()
-    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-    cursor.execute('''
-        SELECT ticker FROM checked_tickers
-        WHERE filter_hash = ? AND checked_at >= ?
-    ''', (filter_hash, cutoff))
-    rows = cursor.fetchall()
-    conn.close()
-    return set(row[0] for row in rows)
+    """No-op: return empty set without Supabase"""
+    return set()
 
 
 def _sqlite_clear_old_checked(days: int = 30):
-    """Clear checked tickers older than N days"""
-    conn = _sqlite_get_connection()
-    cursor = conn.cursor()
-    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-    cursor.execute('DELETE FROM checked_tickers WHERE checked_at < ?', (cutoff,))
-    conn.commit()
-    conn.close()
+    """No-op: nothing to clear without Supabase"""
+    pass
 
 
 # Public API for checked tickers
@@ -601,7 +559,7 @@ else:
 
 
 def get_checked_tickers_count(filters: Dict = None) -> int:
-    """Get total count of checked tickers (for debugging)"""
+    """Get total count of checked tickers (requires Supabase)"""
     if USE_SUPABASE:
         try:
             client = _get_supabase()
@@ -616,20 +574,12 @@ def get_checked_tickers_count(filters: Dict = None) -> int:
             print(f"Supabase checked count error: {e}")
             return 0
     else:
-        conn = _sqlite_get_connection()
-        cursor = conn.cursor()
-        if filters:
-            filter_hash = _get_filter_hash(filters)
-            cursor.execute('SELECT COUNT(*) FROM checked_tickers WHERE filter_hash = ?', (filter_hash,))
-        else:
-            cursor.execute('SELECT COUNT(*) FROM checked_tickers')
-        row = cursor.fetchone()
-        conn.close()
-        return row[0] if row else 0
+        # No local caching without Supabase
+        return 0
 
 
 def clear_all_checked_tickers():
-    """Clear ALL checked tickers from cache (both local and cloud)"""
+    """Clear ALL checked tickers from cache (requires Supabase)"""
     if USE_SUPABASE:
         try:
             client = _get_supabase()
@@ -639,12 +589,8 @@ def clear_all_checked_tickers():
         except Exception as e:
             print(f"Supabase clear all checked error: {e}")
     else:
-        conn = _sqlite_get_connection()
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM checked_tickers')
-        conn.commit()
-        conn.close()
-        print("Cleared all checked tickers from SQLite")
+        # No local caching without Supabase
+        pass
 
 
 # ==================== TICKERS TABLE (NEW) ====================

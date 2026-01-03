@@ -470,109 +470,20 @@ st.markdown('''
 ''', unsafe_allow_html=True)
 
 # ==================== MAIN TABS (Google Flights Style) ====================
-tab_analyze, tab_batch, tab_history, tab_settings = st.tabs([
-    "Analyze Stock",
-    "Batch Screener",
-    "Analysis History",
-    "Settings"
+tab_screen, tab_analyze, tab_history = st.tabs([
+    "Screen & Analyze",
+    "Single Stock",
+    "History"
 ])
 
-# ==================== TAB: SETTINGS ====================
-with tab_settings:
-    st.markdown("### Configuration")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("#### Data Source")
-        data_source = st.radio(
-            "Select Data Source",
-            ["Roic.ai (30+ years)", "Yahoo Finance (4-5 years)"],
-            help="Roic.ai requires API key but provides 30+ years of data",
-            label_visibility="collapsed"
-        )
-
-        if "Roic" in data_source:
-            api_key = st.text_input(
-                "Roic.ai API Key",
-                value=st.session_state.api_key,
-                type="password",
-                help="Get your API key from roic.ai"
-            )
-            st.session_state.api_key = api_key
-            if api_key:
-                st.success("API key provided")
-            else:
-                st.warning("API key required for Roic.ai")
-        else:
-            api_key = "not_needed"
-
-    with col2:
-        st.markdown("#### DCF Parameters")
-        preset_name = st.selectbox(
-            "Parameter Preset",
-            list(PRESET_CONFIGS.keys()),
-            help="Choose a preset configuration"
-        )
-        preset = PRESET_CONFIGS[preset_name]
-        st.info(f"**{preset['name']}:** {preset['description']}")
-
-    # Advanced parameters
-    with st.expander("Customize Parameters"):
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            wacc = st.number_input(
-                "WACC %", min_value=1.0, max_value=50.0,
-                value=preset['wacc'] * 100, step=0.5
-            ) / 100
-
-            terminal_growth = st.number_input(
-                "Terminal Growth %", min_value=0.0, max_value=10.0,
-                value=preset['terminal_growth_rate'] * 100, step=0.25
-            ) / 100
-
-        with col2:
-            fcf_growth = st.number_input(
-                "FCF Growth %", min_value=-50.0, max_value=100.0,
-                value=preset['fcf_growth_rate'] * 100, step=1.0
-            ) / 100
-
-            projection_years = st.number_input(
-                "Projection Years", min_value=1, max_value=30,
-                value=preset['projection_years'], step=1
-            )
-
-        with col3:
-            margin_of_safety = st.number_input(
-                "Margin of Safety %", min_value=0.0, max_value=50.0,
-                value=preset['conservative_adjustment'] * 100, step=5.0
-            ) / 100
-
-            input_type = st.radio(
-                "DCF Input Type",
-                ["fcf", "eps_cont_ops"],
-                format_func=lambda x: "Free Cash Flow" if x == "fcf" else "EPS Cont Ops"
-            )
-
-        # Store customized params
-        st.session_state.custom_params = {
-            'wacc': wacc,
-            'terminal_growth_rate': terminal_growth,
-            'fcf_growth_rate': fcf_growth,
-            'projection_years': projection_years,
-            'conservative_adjustment': margin_of_safety,
-            'dcf_input_type': input_type,
-            'normalize_starting_value': preset['normalize_starting_value'],
-            'normalization_years': preset['normalization_years']
-        }
-
-    # Store default params if not customized
-    if 'custom_params' not in st.session_state:
-        st.session_state.custom_params = preset.copy()
-
-    # Store data source
-    st.session_state.data_source = data_source
+# ==================== INITIALIZE DEFAULT SETTINGS ====================
+# Initialize data source and API key
+if 'data_source' not in st.session_state:
+    st.session_state.data_source = "Roic.ai (30+ years)"
+if 'api_key' not in st.session_state:
+    st.session_state.api_key = ''
+if 'custom_params' not in st.session_state:
+    st.session_state.custom_params = PRESET_CONFIGS['conservative'].copy()
 
 # Get current settings
 data_source = st.session_state.get('data_source', "Roic.ai (30+ years)")
@@ -602,7 +513,7 @@ with tab_analyze:
         if not ticker:
             st.error("Please enter a stock ticker")
         elif "Roic" in data_source and not api_key:
-            st.error("Please enter your Roic.ai API key in Settings tab")
+            st.error("Please enter your Roic.ai API key in DCF Parameters (Screen & Analyze tab)")
         else:
             # Check if recently analyzed with same params
             recently_run, last_run_date = was_recently_analyzed(ticker, params)
@@ -682,12 +593,231 @@ with tab_analyze:
     else:
         st.info("Enter a stock ticker and click 'Analyze' to begin")
 
-# ==================== TAB: BATCH SCREENER ====================
-with tab_batch:
+# ==================== TAB: SCREEN & ANALYZE ====================
+with tab_screen:
     # Get all filter options
     all_exchanges = get_all_exchanges()
     all_sectors = get_all_sectors()
     all_caps = get_all_market_cap_universes()
+
+    # ===== UNIFIED CONFIGURATION PANEL =====
+    st.markdown("##### Configuration")
+
+    # Config management row
+    config_col1, config_col2, config_col3, config_col4 = st.columns([1.5, 1, 1, 1])
+
+    with config_col1:
+        # Load existing configs from Supabase
+        saved_configs = db_storage.list_user_configs()
+        config_names = [""] + [c['config_name'] for c in saved_configs]
+        selected_config = st.selectbox(
+            "Load Configuration",
+            options=config_names,
+            index=0,
+            placeholder="Select saved config...",
+            key="config_selector"
+        )
+
+        # Load the selected config
+        if selected_config and selected_config != st.session_state.get('last_loaded_config', ''):
+            loaded = db_storage.load_user_config(selected_config)
+            if loaded:
+                # Update DCF params
+                if 'dcf_params' in loaded:
+                    st.session_state.custom_params = loaded['dcf_params']
+                # Update filter checkboxes
+                if 'filters' in loaded:
+                    filters = loaded['filters']
+                    # Clear all first
+                    for ex in all_exchanges:
+                        st.session_state[f"ex_{ex}"] = False
+                    for sec in all_sectors:
+                        st.session_state[f"sec_{sec}"] = False
+                    for cap in all_caps:
+                        st.session_state[f"cap_{cap}"] = False
+                    # Set selected ones
+                    for ex in filters.get('exchanges', []):
+                        if f"ex_{ex}" in st.session_state:
+                            st.session_state[f"ex_{ex}"] = True
+                    for sec in filters.get('sectors', []):
+                        if f"sec_{sec}" in st.session_state:
+                            st.session_state[f"sec_{sec}"] = True
+                    for cap in filters.get('market_caps', []):
+                        if f"cap_{cap}" in st.session_state:
+                            st.session_state[f"cap_{cap}"] = True
+                st.session_state['last_loaded_config'] = selected_config
+                st.rerun()
+
+    with config_col2:
+        new_config_name = st.text_input("Config Name", placeholder="My Config", key="new_config_name", label_visibility="collapsed")
+
+    with config_col3:
+        if st.button("Save Config", type="primary", use_container_width=True):
+            if new_config_name:
+                # Get current filter selections
+                current_exchanges = [ex for ex in all_exchanges if st.session_state.get(f"ex_{ex}", False)]
+                current_sectors = [sec for sec in all_sectors if st.session_state.get(f"sec_{sec}", False)]
+                current_caps = [cap for cap in all_caps if st.session_state.get(f"cap_{cap}", False)]
+
+                config_data = {
+                    'dcf_params': st.session_state.get('custom_params', PRESET_CONFIGS['conservative']),
+                    'filters': {
+                        'exchanges': current_exchanges,
+                        'sectors': current_sectors,
+                        'market_caps': current_caps
+                    }
+                }
+
+                if db_storage.save_user_config(new_config_name, config_data):
+                    st.success(f"Saved: {new_config_name}")
+                    st.session_state['last_loaded_config'] = ''
+                    st.rerun()
+                else:
+                    st.error("Failed to save config")
+            else:
+                st.warning("Enter a config name")
+
+    with config_col4:
+        if st.button("Delete Config", use_container_width=True):
+            if selected_config:
+                if db_storage.delete_user_config(selected_config):
+                    st.success(f"Deleted: {selected_config}")
+                    st.session_state['last_loaded_config'] = ''
+                    st.rerun()
+                else:
+                    st.error("Failed to delete")
+
+    # DCF Parameters in expander
+    with st.expander("DCF Parameters", expanded=False):
+        # Preset selector row
+        preset_col, api_col = st.columns([1, 1])
+
+        with preset_col:
+            preset_options = list(PRESET_CONFIGS.keys())
+            current_preset = st.selectbox(
+                "Preset",
+                options=preset_options,
+                index=0,
+                format_func=lambda x: PRESET_CONFIGS[x]['name'],
+                key="dcf_preset"
+            )
+
+            # Apply preset button
+            if st.button("Apply Preset"):
+                st.session_state.custom_params = PRESET_CONFIGS[current_preset].copy()
+                st.rerun()
+
+        with api_col:
+            # API Key - show current status
+            current_key = st.session_state.get('api_key', '')
+            masked_key = f"{current_key[:8]}..." if len(current_key) > 8 else current_key
+            new_api_key = st.text_input(
+                "ROIC API Key",
+                value=current_key,
+                type="password",
+                help=f"Current: {masked_key}" if current_key else "Enter your ROIC.AI API key"
+            )
+            if new_api_key != current_key:
+                st.session_state.api_key = new_api_key
+
+        st.markdown("---")
+
+        # Current params
+        current_params = st.session_state.get('custom_params', PRESET_CONFIGS['conservative'])
+
+        # Parameter inputs in columns
+        param_col1, param_col2, param_col3, param_col4 = st.columns(4)
+
+        with param_col1:
+            wacc = st.number_input(
+                "WACC (%)",
+                min_value=1.0,
+                max_value=30.0,
+                value=float(current_params.get('wacc', 0.10) * 100),
+                step=0.5,
+                key="param_wacc"
+            )
+            st.session_state.custom_params['wacc'] = wacc / 100
+
+        with param_col2:
+            terminal_growth = st.number_input(
+                "Terminal Growth (%)",
+                min_value=0.0,
+                max_value=10.0,
+                value=float(current_params.get('terminal_growth_rate', 0.02) * 100),
+                step=0.25,
+                key="param_terminal"
+            )
+            st.session_state.custom_params['terminal_growth_rate'] = terminal_growth / 100
+
+        with param_col3:
+            fcf_growth = st.number_input(
+                "FCF Growth (%)",
+                min_value=0.0,
+                max_value=50.0,
+                value=float(current_params.get('fcf_growth_rate', 0.05) * 100),
+                step=1.0,
+                key="param_fcf_growth"
+            )
+            st.session_state.custom_params['fcf_growth_rate'] = fcf_growth / 100
+
+        with param_col4:
+            projection_years = st.number_input(
+                "Projection Years",
+                min_value=3,
+                max_value=15,
+                value=int(current_params.get('projection_years', 5)),
+                step=1,
+                key="param_proj_years"
+            )
+            st.session_state.custom_params['projection_years'] = projection_years
+
+        # Second row of params
+        param_col5, param_col6, param_col7, param_col8 = st.columns(4)
+
+        with param_col5:
+            conservative_adj = st.number_input(
+                "Margin of Safety (%)",
+                min_value=0.0,
+                max_value=50.0,
+                value=float(current_params.get('conservative_adjustment', 0.0) * 100),
+                step=5.0,
+                key="param_mos"
+            )
+            st.session_state.custom_params['conservative_adjustment'] = conservative_adj / 100
+
+        with param_col6:
+            normalize = st.checkbox(
+                "Normalize Starting FCF",
+                value=current_params.get('normalize_starting_value', True),
+                key="param_normalize"
+            )
+            st.session_state.custom_params['normalize_starting_value'] = normalize
+
+        with param_col7:
+            if normalize:
+                norm_years = st.number_input(
+                    "Normalization Years",
+                    min_value=2,
+                    max_value=10,
+                    value=int(current_params.get('normalization_years', 5)),
+                    step=1,
+                    key="param_norm_years"
+                )
+                st.session_state.custom_params['normalization_years'] = norm_years
+
+        with param_col8:
+            input_type = st.selectbox(
+                "DCF Input",
+                options=['fcf', 'eps_cont_ops'],
+                index=0 if current_params.get('dcf_input_type', 'fcf') == 'fcf' else 1,
+                format_func=lambda x: "Free Cash Flow" if x == 'fcf' else "EPS (Cont. Ops)",
+                key="param_input_type"
+            )
+            st.session_state.custom_params['dcf_input_type'] = input_type
+
+    st.markdown("---")
+    st.markdown("##### Screening Filters")
 
     # Initialize filter states in session
     # Initialize checkbox states for filters (use individual keys to avoid value/session_state conflict)
@@ -929,7 +1059,7 @@ with tab_batch:
     # Batch execution
     if run_batch:
         if "Roic" in data_source and not api_key:
-            st.error("Please enter your Roic.ai API key in Settings tab")
+            st.error("Please enter your Roic.ai API key in DCF Parameters (Screen & Analyze tab)")
         else:
             progress_bar = st.progress(0)
             status_text = st.empty()
