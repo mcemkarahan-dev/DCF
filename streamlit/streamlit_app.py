@@ -34,7 +34,7 @@ st.set_page_config(
 )
 
 # Version for deployment verification
-APP_VERSION = "v2.7"
+APP_VERSION = "v2.8"
 
 # Compact UI via components.html - debounced to prevent loops
 import streamlit.components.v1 as components
@@ -621,6 +621,26 @@ def format_value(val):
     else:
         return f"${val:,.0f}"
 
+# Currency symbols for formatting
+CURRENCY_SYMBOLS = {
+    'USD': '$', 'EUR': '€', 'GBP': '£', 'JPY': '¥', 'CNY': '¥',
+    'CHF': 'CHF ', 'CAD': 'C$', 'AUD': 'A$', 'HKD': 'HK$', 'SGD': 'S$',
+    'KRW': '₩', 'INR': '₹', 'BRL': 'R$', 'MXN': 'MX$', 'TWD': 'NT$',
+    'SEK': 'kr', 'NOK': 'kr', 'DKK': 'kr', 'PLN': 'zł', 'THB': '฿',
+    'ZAR': 'R', 'RUB': '₽', 'TRY': '₺', 'ILS': '₪', 'IDR': 'Rp',
+}
+
+def get_currency_symbol(currency_code):
+    """Get currency symbol from code, with fallback to code itself"""
+    return CURRENCY_SYMBOLS.get(currency_code, f'{currency_code} ')
+
+def format_price_with_currency(value, currency_code):
+    """Format a price with the appropriate currency symbol"""
+    symbol = get_currency_symbol(currency_code)
+    if currency_code in ['JPY', 'KRW', 'IDR']:  # No decimals for these
+        return f"{symbol}{value:,.0f}"
+    return f"{symbol}{value:,.2f}"
+
 def get_params_hash(params):
     """Create a hash of DCF parameters for comparison"""
     key_params = (
@@ -767,13 +787,17 @@ with tab_analyze:
         dcf = result['dcf_result']
         shares = dcf.get('shares_outstanding', 1)
         discount = result['discount']
+        reporting_currency = result.get('reporting_currency', 'USD')
+        stock_currency = result.get('stock_currency', 'USD')
 
         # Header row
         c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
 
         with c1:
             st.markdown(f"### {result['ticker']}")
-            st.caption(f"{result.get('company_name', '')} • {result.get('sector', 'N/A')} • {result.get('industry', 'N/A')}")
+            country = result.get('country', '')
+            country_display = f" • {country}" if country and country not in ['N/A', 'United States', 'United States of America'] else ""
+            st.caption(f"{result.get('company_name', '')} • {result.get('sector', 'N/A')} • {result.get('industry', 'N/A')}{country_display}")
             description = result.get('description', '')
             if description:
                 # Truncate to ~200 chars for header display
@@ -781,16 +805,22 @@ with tab_analyze:
                 st.markdown(f"<p style='font-size: 0.85em; color: #64748b; margin-top: -10px;'>{short_desc}</p>", unsafe_allow_html=True)
 
         with c2:
-            st.metric("Current Price", f"${result['current_price']:.2f}")
+            price_display = format_price_with_currency(result['current_price'], stock_currency)
+            st.metric(f"Price ({stock_currency})", price_display)
 
         with c3:
-            st.metric("Intrinsic Value", f"${result['intrinsic_value']:.2f}")
+            iv_display = format_price_with_currency(result['intrinsic_value'], reporting_currency)
+            st.metric(f"IV ({reporting_currency})", iv_display)
 
         with c4:
             if discount > 0:
                 st.metric("Discount", f"{discount:.1f}%", delta="Undervalued", delta_color="normal")
             else:
                 st.metric("Premium", f"{abs(discount):.1f}%", delta="Overvalued", delta_color="inverse")
+
+        # Currency mismatch warning for ADRs
+        if reporting_currency != stock_currency:
+            st.warning(f"**Currency Note:** Stock trades in {stock_currency}, financials reported in {reporting_currency}. Intrinsic value and discount % are calculated in {reporting_currency}.")
 
         # Details
         with st.expander("Valuation Details", expanded=True):
@@ -1558,6 +1588,7 @@ with tab_history:
                 'Company': r.get('company_name', '')[:25],
                 'Universe': get_market_cap_universe(mkt_cap),
                 'Sector': r.get('sector', 'N/A'),
+                'Ccy': r.get('reporting_currency', 'USD'),
                 'Price': r.get('current_price', 0),
                 'IV': r.get('intrinsic_value', 0),
                 'Discount': r.get('discount', 0),
@@ -2029,6 +2060,13 @@ with tab_history:
                     intrinsic_val = selected_result.get('intrinsic_value', 0)
                     discount = selected_result.get('discount', 0)
                     mkt_cap = selected_result.get('market_cap', 0)
+                    country = selected_result.get('country', 'N/A')
+                    reporting_currency = selected_result.get('reporting_currency', 'USD')
+                    stock_currency = selected_result.get('stock_currency', 'USD')
+
+                    # Format prices with correct currencies
+                    price_formatted = format_price_with_currency(curr_price, stock_currency)
+                    iv_formatted = format_price_with_currency(intrinsic_val, reporting_currency)
 
                     # Build the info box with border
                     about_html = ""
@@ -2036,25 +2074,39 @@ with tab_history:
                         short_desc = description[:300] + "..." if len(description) > 300 else description
                         about_html = f"<p style='font-size: 0.8em; color: #64748b; margin-top: 8px;'>{short_desc}</p>"
 
+                    # Currency mismatch warning for ADRs
+                    currency_warning = ""
+                    if reporting_currency != stock_currency:
+                        currency_warning = f"""
+                        <div style="background: #fef7e0; border: 1px solid #f9ab00; border-radius: 4px; padding: 8px; margin-bottom: 12px; font-size: 0.8em;">
+                            <strong>⚠️ Currency Note:</strong> Stock trades in {stock_currency}, financials reported in {reporting_currency}.
+                            Intrinsic value shown in {reporting_currency}.
+                        </div>
+                        """
+
                     discount_text = f"{discount:.1f}%" if discount > 0 else f"{abs(discount):.1f}%"
                     discount_label = "Discount" if discount > 0 else "Premium"
                     discount_color = "#137333" if discount > 0 else "#c5221f"
                     valuation_text = "Undervalued" if discount > 0 else "Overvalued"
 
+                    # Show country if not US
+                    country_display = f" • {country}" if country and country not in ['N/A', 'United States', 'United States of America'] else ""
+
                     info_box_html = f"""
                     <div style="border: 1px solid #dadce0; border-radius: 8px; padding: 16px; background: #fff;">
                         <div style="font-weight: 600; font-size: 1.1em; color: #202124;">{company_name}</div>
-                        <div style="font-size: 0.85em; color: #5f6368; margin-bottom: 12px;">{sector} • {industry}</div>
+                        <div style="font-size: 0.85em; color: #5f6368; margin-bottom: 12px;">{sector} • {industry}{country_display}</div>
                         {about_html}
+                        {currency_warning}
                         <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 12px 0;">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             <div>
-                                <div style="font-size: 0.75em; color: #5f6368;">Current Price</div>
-                                <div style="font-size: 1.1em; font-weight: 500;">${curr_price:.2f}</div>
+                                <div style="font-size: 0.75em; color: #5f6368;">Current Price ({stock_currency})</div>
+                                <div style="font-size: 1.1em; font-weight: 500;">{price_formatted}</div>
                             </div>
                             <div>
-                                <div style="font-size: 0.75em; color: #5f6368;">Intrinsic Value</div>
-                                <div style="font-size: 1.1em; font-weight: 500;">${intrinsic_val:.2f}</div>
+                                <div style="font-size: 0.75em; color: #5f6368;">Intrinsic Value ({reporting_currency})</div>
+                                <div style="font-size: 1.1em; font-weight: 500;">{iv_formatted}</div>
                             </div>
                             <div>
                                 <div style="font-size: 0.75em; color: #5f6368;">{discount_label}</div>

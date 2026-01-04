@@ -51,9 +51,10 @@ class RoicDataFetcher:
                 'exchangeShortName': 'N/A',
                 'sector': 'N/A',
                 'industry': 'N/A',
-                'mktCap': 0
+                'mktCap': 0,
+                'currency': 'USD'
             }
-        
+
         profile = data[0]
 
         return {
@@ -63,26 +64,33 @@ class RoicDataFetcher:
             'sector': profile.get('sector') or 'N/A',
             'industry': profile.get('industry') or 'N/A',
             'description': profile.get('description') or '',
-            'mktCap': 0  # Will calculate from price * shares if needed
+            'mktCap': 0,  # Will calculate from price * shares if needed
+            'currency': profile.get('currency') or 'USD',  # Stock trading currency
+            'country': profile.get('country') or 'N/A'
         }
     
-    def get_income_statement(self, ticker: str, period: str = "annual", limit: int = 10) -> List[Dict]:
+    def get_income_statement(self, ticker: str, period: str = "annual", limit: int = 10) -> tuple:
         """
         Get income statement data
         period: 'annual' or 'quarterly'
         limit: number of periods to fetch (roic supports 30+ years)
+
+        Returns: (list of statements, reporting_currency)
         """
         endpoint = f"fundamental/income-statement/{ticker}"
         params = {'limit': limit}
-        
+
         if period == "quarterly":
             params['period'] = 'quarterly'
-        
+
         data = self._make_request(endpoint, params)
-        
+
         if not data:
-            return []
-        
+            return [], 'USD'
+
+        # Extract reporting currency from first record
+        reporting_currency = data[0].get('currency', 'USD') if data else 'USD'
+
         # Convert roic.ai format to our standard format
         results = []
         for item in data:
@@ -144,8 +152,8 @@ class RoicDataFetcher:
                 'eps_cont_ops': eps_cont_ops,
                 'period': period
             })
-        
-        return results
+
+        return results, reporting_currency
     
     def get_balance_sheet(self, ticker: str, period: str = "annual", limit: int = 10) -> List[Dict]:
         """Get balance sheet data"""
@@ -363,22 +371,23 @@ class RoicDataFetcher:
         years_back: How many years of history to fetch (roic supports 30+)
         """
         print(f"Fetching {years_back} years of data for {ticker} from Roic.ai...")
-        
+
         profile = self.get_company_profile(ticker)
-        income_statements = self.get_income_statement(ticker, limit=years_back)
+        income_statements, reporting_currency = self.get_income_statement(ticker, limit=years_back)
         balance_sheets = self.get_balance_sheet(ticker, limit=years_back)
         cash_flows = self.get_cash_flow(ticker, limit=years_back)
         key_metrics = self.get_key_metrics(ticker, limit=years_back)
-        
+
         # Try to get current price, but don't fail if it doesn't work
         try:
             current_price = self.get_current_price(ticker)
         except Exception as e:
             print(f"Warning: Could not fetch current price: {e}")
             current_price = None
-        
-        # Keep profile company name from API (don't override with ticker)
-        
+
+        # Get stock trading currency from profile (may differ from reporting currency for ADRs)
+        stock_currency = profile.get('currency', 'USD') if profile else 'USD'
+
         return {
             'ticker': ticker,
             'profile': profile,
@@ -386,7 +395,9 @@ class RoicDataFetcher:
             'balance_sheets': balance_sheets,
             'cash_flows': cash_flows,
             'key_metrics': key_metrics,
-            'current_price': current_price
+            'current_price': current_price,
+            'reporting_currency': reporting_currency,
+            'stock_currency': stock_currency
         }
     
     def get_exchange_tickers(self, exchange: str, limit: int = None) -> List[str]:

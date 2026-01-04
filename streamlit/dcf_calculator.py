@@ -727,17 +727,24 @@ class DCFAnalyzer:
         # Get market cap for universe classification
         market_cap = current_price * dcf_result.get('shares_outstanding', 0) if current_price else 0
 
+        # Get currency info (ROIC data source provides this)
+        reporting_currency = financial_data.get('reporting_currency', 'USD')
+        stock_currency = financial_data.get('stock_currency', 'USD')
+
         return {
             'ticker': ticker,
             'company_name': profile.get('companyName', ticker),
             'sector': profile.get('sector', 'N/A'),
             'industry': profile.get('industry', 'N/A'),
             'description': profile.get('description', ''),
+            'country': profile.get('country', 'N/A'),
             'market_cap': market_cap,
             'intrinsic_value': intrinsic_value,
             'current_price': current_price,
             'discount': discount,
-            'dcf_result': dcf_result
+            'dcf_result': dcf_result,
+            'reporting_currency': reporting_currency,
+            'stock_currency': stock_currency
         }
 
 

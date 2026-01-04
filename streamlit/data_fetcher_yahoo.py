@@ -203,7 +203,9 @@ class YahooFinanceFetcher:
             'balance_sheets': balance_sheets,
             'cash_flows': cash_flows,
             'key_metrics': key_metrics,
-            'current_price': current_price
+            'current_price': current_price,
+            'reporting_currency': 'USD',  # Yahoo Finance data is typically in USD
+            'stock_currency': 'USD'
         }
     
     def get_exchange_tickers(self, exchange: str, limit: int = None) -> List[str]:
