@@ -34,7 +34,63 @@ st.set_page_config(
 )
 
 # Version for deployment verification
-APP_VERSION = "v2.1-compact"
+APP_VERSION = "v2.2-compact"
+
+# JavaScript to compact UI elements after Streamlit renders
+st.markdown("""
+<script>
+// Wait for Streamlit to fully render, then compact elements
+function compactUI() {
+    // Compact all buttons
+    document.querySelectorAll('button').forEach(btn => {
+        btn.style.height = '32px';
+        btn.style.minHeight = '32px';
+        btn.style.padding = '0 12px';
+        btn.style.fontSize = '13px';
+    });
+
+    // Compact all select containers
+    document.querySelectorAll('[data-baseweb="select"]').forEach(sel => {
+        sel.style.minHeight = '32px';
+        const inner = sel.querySelector('div');
+        if (inner) {
+            inner.style.minHeight = '32px';
+            inner.style.padding = '2px 8px';
+        }
+    });
+
+    // Compact all inputs
+    document.querySelectorAll('input').forEach(inp => {
+        inp.style.height = '32px';
+        inp.style.padding = '4px 8px';
+        inp.style.fontSize = '13px';
+    });
+
+    // Compact expander headers
+    document.querySelectorAll('[data-testid="stExpander"] summary').forEach(exp => {
+        exp.style.padding = '8px 12px';
+        exp.style.minHeight = '36px';
+    });
+
+    // Reduce label sizes
+    document.querySelectorAll('label').forEach(lbl => {
+        lbl.style.fontSize = '12px';
+    });
+
+    console.log('UI compacted v2.2');
+}
+
+// Run on load and on Streamlit rerun
+if (document.readyState === 'complete') {
+    setTimeout(compactUI, 100);
+} else {
+    window.addEventListener('load', () => setTimeout(compactUI, 100));
+}
+
+// Also run periodically to catch dynamic updates
+setInterval(compactUI, 2000);
+</script>
+""", unsafe_allow_html=True)
 
 # Custom CSS for Google Flights-inspired styling (Desktop + Mobile)
 st.markdown("""
