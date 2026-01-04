@@ -34,7 +34,7 @@ st.set_page_config(
 )
 
 # Version for deployment verification
-APP_VERSION = "v2.6"
+APP_VERSION = "v2.7"
 
 # Compact UI via components.html - debounced to prevent loops
 import streamlit.components.v1 as components
@@ -851,7 +851,7 @@ with tab_screen:
 
     # Config management - label row then controls row for alignment
     st.caption("Load / Save Configuration")
-    config_col1, config_col2, config_col3 = st.columns([2.5, 1, 0.8])
+    config_col1, config_col2, config_col3 = st.columns([1, 1, 1])
 
     with config_col1:
         saved_configs = db_storage.list_user_configs()
@@ -1299,17 +1299,17 @@ with tab_screen:
     else:
         st.caption(f"Cache: {backend} (shared) | Total cached for these filters: {total_checked}")
 
-    # Run button and controls - narrower
-    _, col1, col2, col3, col4, _ = st.columns([0.3, 0.8, 0.6, 0.7, 1.5, 1])
+    # Run button and controls - left-aligned, equal size, tight spacing
+    btn_col1, btn_col2, btn_col3, btn_spacer = st.columns([1, 1, 1, 4])
 
-    with col1:
-        run_batch = st.button("Run Batch", type="primary")
+    with btn_col1:
+        run_batch = st.button("Run Batch", type="primary", use_container_width=True)
 
-    with col2:
-        stop_batch = st.button("Stop")
+    with btn_col2:
+        stop_batch = st.button("Stop", use_container_width=True)
 
-    with col3:
-        if st.button("Clear Cache"):
+    with btn_col3:
+        if st.button("Clear Cache", use_container_width=True):
             db_storage.clear_all_checked_tickers()
             st.success("Cache cleared!")
             st.rerun()
