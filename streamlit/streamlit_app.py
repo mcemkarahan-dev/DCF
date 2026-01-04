@@ -33,6 +33,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"  # Collapse sidebar by default for cleaner look
 )
 
+# Version for deployment verification
+APP_VERSION = "v2.1-compact"
+
 # Custom CSS for Google Flights-inspired styling (Desktop + Mobile)
 st.markdown("""
 <style>
@@ -463,6 +466,33 @@ st.markdown("""
         }
     }
 </style>
+""", unsafe_allow_html=True)
+
+# JavaScript to inject styles after DOM is ready (more reliable than CSS alone)
+st.markdown("""
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inject compact styles via JavaScript
+    var style = document.createElement('style');
+    style.textContent = `
+        /* JS-injected compact styles v2.1 */
+        button { height: 32px !important; min-height: 32px !important; font-size: 13px !important; }
+        input { height: 32px !important; font-size: 13px !important; }
+        [data-baseweb="select"] > div { min-height: 32px !important; }
+        label { font-size: 12px !important; }
+        .main .block-container { max-width: 1200px !important; }
+    `;
+    document.head.appendChild(style);
+    console.log('Compact styles injected via JS');
+});
+</script>
+""", unsafe_allow_html=True)
+
+# Show version at bottom right (small, subtle)
+st.markdown(f"""
+<div style="position: fixed; bottom: 5px; right: 10px; font-size: 10px; color: #999; z-index: 9999;">
+    {APP_VERSION}
+</div>
 """, unsafe_allow_html=True)
 
 # Initialize session state
