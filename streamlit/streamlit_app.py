@@ -1042,6 +1042,12 @@ with tab_screen:
     else:
         st.caption("No filters - screening all stocks")
 
+    # Warning if market cap filter excludes Unknown (which is 99% of data)
+    if sel_caps and "Unknown" not in sel_caps:
+        st.warning("⚠️ **Market cap data is limited** - only ~500 tickers have known market cap. "
+                   "Your filter excludes 'Unknown' which contains most stocks. "
+                   "Consider including 'Unknown' or removing the market cap filter.")
+
     st.markdown("---")
 
     # Storage status for cache
