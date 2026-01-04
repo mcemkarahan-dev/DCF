@@ -796,19 +796,20 @@ with tab_screen:
         st.session_state['param_normalize'] = params.get('normalize_starting_value', True)
         st.session_state['param_norm_years'] = int(params.get('normalization_years', 5))
 
-    # Config management row - narrower columns
-    pad_left, config_col1, config_col2, config_col3, pad_right = st.columns([0.5, 1.5, 0.8, 0.8, 1.5])
+    # Config management - label row then controls row for alignment
+    st.caption("Load / Save Configuration")
+    config_col1, config_col2, config_col3 = st.columns([2.5, 1, 0.8])
 
     with config_col1:
-        # Load existing configs from Supabase
         saved_configs = db_storage.list_user_configs()
         config_names = [""] + [c['config_name'] for c in saved_configs]
         selected_config = st.selectbox(
-            "Load Configuration",
+            "config_select",
             options=config_names,
             index=0,
             placeholder="Select saved config...",
-            key="config_selector"
+            key="config_selector",
+            label_visibility="collapsed"
         )
 
         # Load the selected config
@@ -1012,7 +1013,6 @@ with tab_screen:
             st.session_state.custom_params['dcf_input_type'] = input_type
 
     st.markdown("---")
-    st.markdown("##### Screening Filters")
 
     # Filter states already initialized at top of tab_screen
 
@@ -1045,8 +1045,11 @@ with tab_screen:
             for cap in all_caps:
                 st.session_state[f"cap_{cap}"] = False
 
-    # Filter buttons row - add padding columns to narrow the content
-    pad1, filter_col1, filter_col2, filter_col3, filter_col4, filter_col5, pad2 = st.columns([0.3, 1, 1, 1, 0.8, 0.6, 0.3])
+    # Screening Filters section
+    st.markdown("##### Screening Filters")
+
+    # Filter row - all elements aligned (no labels above individual elements)
+    filter_col1, filter_col2, filter_col3, filter_col4, filter_col5 = st.columns([1.2, 1.2, 1.2, 0.7, 0.5])
     filter_cols = [filter_col1, filter_col2, filter_col3, filter_col4, filter_col5]
 
     # Exchange Filter
@@ -1139,18 +1142,19 @@ with tab_screen:
             for cap in all_caps:
                 st.checkbox(cap, key=f"cap_{cap}", disabled=exclude_mkt_cap)
 
-    # Max Stocks
+    # Max Stocks - label collapsed for alignment
     with filter_cols[3]:
         max_stocks = st.number_input(
-            "Max Stocks",
+            "Max",
             min_value=5,
             max_value=100,
             value=20,
             step=5,
-            label_visibility="visible"
+            label_visibility="collapsed",
+            help="Max stocks to screen"
         )
 
-    # Reset button callback (must run before widgets render)
+    # Reset button callback
     def reset_all_filters():
         for ex in all_exchanges:
             st.session_state[f"ex_{ex}"] = False
@@ -1158,11 +1162,10 @@ with tab_screen:
             st.session_state[f"sec_{sec}"] = False
         for cap in all_caps:
             st.session_state[f"cap_{cap}"] = False
-        st.session_state["exclude_market_cap_filter"] = True  # Reset to excluded
+        st.session_state["exclude_market_cap_filter"] = True
 
     with filter_cols[4]:
-        st.markdown("<div style='height: 28px'></div>", unsafe_allow_html=True)
-        st.button("Reset", use_container_width=True, on_click=reset_all_filters)
+        st.button("Reset", on_click=reset_all_filters)
 
     # Advanced filters
     with st.expander("Advanced Filters ▾"):
