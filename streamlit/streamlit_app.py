@@ -34,79 +34,57 @@ st.set_page_config(
 )
 
 # Version for deployment verification
-APP_VERSION = "v2.5-observer"
+APP_VERSION = "v2.6"
 
-# Use components.html to inject MutationObserver that continuously compacts UI
+# Compact UI via components.html - debounced to prevent loops
 import streamlit.components.v1 as components
 
 components.html("""
 <script>
 (function() {
     const parent = window.parent.document;
+    if (parent.compactUIv26) return;
+    parent.compactUIv26 = true;
 
-    // Prevent duplicate observers
-    if (parent.compactObserverActive) {
-        console.log('Compact observer already active');
-        return;
-    }
-    parent.compactObserverActive = true;
+    let timeout = null;
 
-    function compactElements() {
-        let count = 0;
-
-        // Compact all buttons
-        parent.querySelectorAll('button').forEach(btn => {
-            if (btn.offsetHeight > 36) {
-                btn.style.cssText += 'height:32px!important;min-height:32px!important;max-height:32px!important;padding:0 12px!important;font-size:13px!important;';
-                count++;
-            }
+    function compactUI() {
+        // Mark elements we've already processed
+        parent.querySelectorAll('button:not([data-compacted])').forEach(btn => {
+            btn.setAttribute('data-compacted', '1');
+            btn.style.height = '32px';
+            btn.style.minHeight = '32px';
+            btn.style.padding = '0 12px';
+            btn.style.fontSize = '13px';
         });
 
-        // Compact select containers (baseweb selects)
-        parent.querySelectorAll('[data-baseweb="select"]').forEach(sel => {
-            sel.style.cssText += 'min-height:32px!important;max-height:32px!important;';
-            const inner = sel.querySelector('div');
-            if (inner) {
-                inner.style.cssText += 'min-height:32px!important;max-height:32px!important;padding:2px 8px!important;';
-            }
-            count++;
+        parent.querySelectorAll('[data-baseweb="select"]:not([data-compacted])').forEach(sel => {
+            sel.setAttribute('data-compacted', '1');
+            sel.style.minHeight = '32px';
+            sel.style.maxHeight = '38px';
         });
 
-        // Compact input fields
-        parent.querySelectorAll('input[type="text"], input[type="number"]').forEach(inp => {
-            inp.style.cssText += 'height:32px!important;min-height:32px!important;padding:4px 8px!important;font-size:13px!important;';
-            count++;
+        parent.querySelectorAll('input:not([data-compacted])').forEach(inp => {
+            inp.setAttribute('data-compacted', '1');
+            inp.style.height = '32px';
+            inp.style.minHeight = '32px';
+            inp.style.padding = '4px 8px';
         });
-
-        // Compact number input steppers
-        parent.querySelectorAll('[data-baseweb="input"]').forEach(inp => {
-            inp.style.cssText += 'height:32px!important;min-height:32px!important;';
-            count++;
-        });
-
-        return count;
     }
 
-    // Initial compaction
-    let total = compactElements();
-    console.log('UI compact v2.5 - initial pass:', total, 'elements');
+    function scheduleCompact() {
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(compactUI, 100);
+    }
 
-    // Watch for DOM changes and re-compact
-    const observer = new MutationObserver((mutations) => {
-        let changed = compactElements();
-        if (changed > 0) {
-            console.log('UI compact v2.5 - re-compacted:', changed, 'elements');
-        }
-    });
+    // Initial run
+    setTimeout(compactUI, 500);
 
-    observer.observe(parent.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['style', 'class']
-    });
+    // Watch for new elements only (not attribute changes)
+    const observer = new MutationObserver(scheduleCompact);
+    observer.observe(parent.body, { childList: true, subtree: true });
 
-    console.log('UI compact v2.5 - MutationObserver active');
+    console.log('UI compact v2.6 ready');
 })();
 </script>
 """, height=0)
