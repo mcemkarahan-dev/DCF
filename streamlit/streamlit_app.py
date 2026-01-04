@@ -610,6 +610,8 @@ with tab_screen:
     for cap in all_caps:
         if f"cap_{cap}" not in st.session_state:
             st.session_state[f"cap_{cap}"] = False
+    if "exclude_market_cap_filter" not in st.session_state:
+        st.session_state["exclude_market_cap_filter"] = True  # Default to excluded
 
     # ===== UNIFIED CONFIGURATION PANEL =====
     st.markdown("##### Configuration")
@@ -930,28 +932,42 @@ with tab_screen:
 
     # Market Cap Filter
     with filter_cols[2]:
+        # Check if market cap filter is excluded
+        exclude_mkt_cap = st.session_state.get("exclude_market_cap_filter", True)
+
         # Count selected caps from individual checkbox states
-        sel_caps = [cap for cap in all_caps if st.session_state.get(f"cap_{cap}", False)]
-        cap_count = len(sel_caps)
-        if cap_count == 0 or cap_count == len(all_caps):
+        sel_caps_raw = [cap for cap in all_caps if st.session_state.get(f"cap_{cap}", False)]
+        cap_count = len(sel_caps_raw) if not exclude_mkt_cap else 0
+
+        if exclude_mkt_cap:
+            cap_label = "Market Cap (off)"
+        elif cap_count == 0 or cap_count == len(all_caps):
             cap_label = "Market Cap"
         else:
             cap_label = f"Market Cap ({cap_count})"
 
         with st.expander(f"{cap_label} ▾", expanded=False):
+            # Exclude option at top
+            st.checkbox(
+                "Exclude Market Cap Screener",
+                key="exclude_market_cap_filter",
+                help="Check to disable market cap filtering (recommended - data is limited)"
+            )
+
+            st.markdown("---")
+
             all_selected = cap_count == len(all_caps)
             st.checkbox(
                 "Select all market caps",
                 value=all_selected,
                 key="select_all_caps",
-                on_change=on_select_all_caps
+                on_change=on_select_all_caps,
+                disabled=exclude_mkt_cap
             )
 
-            st.markdown("---")
-
-            # Individual checkboxes - no value param, let session state control
+            # Individual checkboxes - disabled when excluded
             for cap in all_caps:
-                st.checkbox(cap, key=f"cap_{cap}")
+                st.checkbox(cap, key=f"cap_{cap}", disabled=exclude_mkt_cap)
 
     # Max Stocks
     with filter_cols[3]:
@@ -972,6 +988,7 @@ with tab_screen:
             st.session_state[f"sec_{sec}"] = False
         for cap in all_caps:
             st.session_state[f"cap_{cap}"] = False
+        st.session_state["exclude_market_cap_filter"] = True  # Reset to excluded
 
     with filter_cols[4]:
         st.markdown("<div style='height: 28px'></div>", unsafe_allow_html=True)
@@ -1014,7 +1031,11 @@ with tab_screen:
     # Compute selected filters from checkbox states
     sel_exchanges = [ex for ex in all_exchanges if st.session_state.get(f"ex_{ex}", False)]
     sel_sectors = [sec for sec in all_sectors if st.session_state.get(f"sec_{sec}", False)]
-    sel_caps = [cap for cap in all_caps if st.session_state.get(f"cap_{cap}", False)]
+    # Market cap filter is empty if excluded
+    if st.session_state.get("exclude_market_cap_filter", True):
+        sel_caps = []
+    else:
+        sel_caps = [cap for cap in all_caps if st.session_state.get(f"cap_{cap}", False)]
 
     # Build filters dict (empty list = all)
     batch_filters = {

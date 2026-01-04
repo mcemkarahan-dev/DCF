@@ -631,12 +631,7 @@ def get_filtered_tickers(
                 query = query.in_('exchange', exchanges)
 
             if market_caps and len(market_caps) > 0:
-                # Always include "Unknown" since 99% of tickers lack market cap data
-                # This prevents users from accidentally filtering to just ~500 tickers
-                caps_to_query = list(market_caps)
-                if "Unknown" not in caps_to_query:
-                    caps_to_query.append("Unknown")
-                query = query.in_('market_cap_universe', caps_to_query)
+                query = query.in_('market_cap_universe', market_caps)
 
             # Order by ticker for consistent pagination
             query = query.order('ticker')
@@ -691,11 +686,7 @@ def get_tickers_count(
         if exchanges and len(exchanges) > 0:
             query = query.in_('exchange', exchanges)
         if market_caps and len(market_caps) > 0:
-            # Always include "Unknown" since 99% of tickers lack market cap data
-            caps_to_query = list(market_caps)
-            if "Unknown" not in caps_to_query:
-                caps_to_query.append("Unknown")
-            query = query.in_('market_cap_universe', caps_to_query)
+            query = query.in_('market_cap_universe', market_caps)
 
         response = query.execute()
         return response.count if response.count else 0
