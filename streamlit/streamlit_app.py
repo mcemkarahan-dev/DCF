@@ -34,58 +34,80 @@ st.set_page_config(
 )
 
 # Version for deployment verification
-APP_VERSION = "v2.3-compact"
+APP_VERSION = "v2.5-observer"
 
-# Use components.html to inject JS that modifies parent document
+# Use components.html to inject MutationObserver that continuously compacts UI
 import streamlit.components.v1 as components
 
 components.html("""
 <script>
-function compactParentUI() {
+(function() {
     const parent = window.parent.document;
 
-    // Compact all buttons
-    parent.querySelectorAll('button').forEach(btn => {
-        btn.style.setProperty('height', '32px', 'important');
-        btn.style.setProperty('min-height', '32px', 'important');
-        btn.style.setProperty('padding', '0 12px', 'important');
-        btn.style.setProperty('font-size', '13px', 'important');
+    // Prevent duplicate observers
+    if (parent.compactObserverActive) {
+        console.log('Compact observer already active');
+        return;
+    }
+    parent.compactObserverActive = true;
+
+    function compactElements() {
+        let count = 0;
+
+        // Compact all buttons
+        parent.querySelectorAll('button').forEach(btn => {
+            if (btn.offsetHeight > 36) {
+                btn.style.cssText += 'height:32px!important;min-height:32px!important;max-height:32px!important;padding:0 12px!important;font-size:13px!important;';
+                count++;
+            }
+        });
+
+        // Compact select containers (baseweb selects)
+        parent.querySelectorAll('[data-baseweb="select"]').forEach(sel => {
+            sel.style.cssText += 'min-height:32px!important;max-height:32px!important;';
+            const inner = sel.querySelector('div');
+            if (inner) {
+                inner.style.cssText += 'min-height:32px!important;max-height:32px!important;padding:2px 8px!important;';
+            }
+            count++;
+        });
+
+        // Compact input fields
+        parent.querySelectorAll('input[type="text"], input[type="number"]').forEach(inp => {
+            inp.style.cssText += 'height:32px!important;min-height:32px!important;padding:4px 8px!important;font-size:13px!important;';
+            count++;
+        });
+
+        // Compact number input steppers
+        parent.querySelectorAll('[data-baseweb="input"]').forEach(inp => {
+            inp.style.cssText += 'height:32px!important;min-height:32px!important;';
+            count++;
+        });
+
+        return count;
+    }
+
+    // Initial compaction
+    let total = compactElements();
+    console.log('UI compact v2.5 - initial pass:', total, 'elements');
+
+    // Watch for DOM changes and re-compact
+    const observer = new MutationObserver((mutations) => {
+        let changed = compactElements();
+        if (changed > 0) {
+            console.log('UI compact v2.5 - re-compacted:', changed, 'elements');
+        }
     });
 
-    // Compact all select containers
-    parent.querySelectorAll('[data-baseweb="select"]').forEach(sel => {
-        sel.style.setProperty('min-height', '32px', 'important');
+    observer.observe(parent.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class']
     });
 
-    parent.querySelectorAll('[data-baseweb="select"] > div').forEach(div => {
-        div.style.setProperty('min-height', '32px', 'important');
-        div.style.setProperty('padding', '2px 8px', 'important');
-    });
-
-    // Compact all inputs
-    parent.querySelectorAll('input').forEach(inp => {
-        inp.style.setProperty('height', '32px', 'important');
-        inp.style.setProperty('padding', '4px 8px', 'important');
-        inp.style.setProperty('font-size', '13px', 'important');
-    });
-
-    // Compact expander headers
-    parent.querySelectorAll('[data-testid="stExpander"] summary').forEach(exp => {
-        exp.style.setProperty('padding', '8px 12px', 'important');
-        exp.style.setProperty('min-height', '36px', 'important');
-    });
-
-    // Reduce vertical gaps
-    parent.querySelectorAll('.element-container').forEach(el => {
-        el.style.setProperty('margin-bottom', '0.25rem', 'important');
-    });
-
-    console.log('UI compacted v2.3');
-}
-
-// Run immediately and periodically
-compactParentUI();
-setInterval(compactParentUI, 1500);
+    console.log('UI compact v2.5 - MutationObserver active');
+})();
 </script>
 """, height=0)
 

@@ -4,6 +4,8 @@ __pycache__/
 *.db
 .env
 .DS_Store
+secrets.toml
+*.txt
 
 # Windows reserved filenames (cause OneDrive sync issues)
 nul
