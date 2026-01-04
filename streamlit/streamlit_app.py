@@ -2077,12 +2077,7 @@ with tab_history:
                     # Currency mismatch warning for ADRs
                     currency_warning = ""
                     if reporting_currency != stock_currency:
-                        currency_warning = f"""
-                        <div style="background: #fef7e0; border: 1px solid #f9ab00; border-radius: 4px; padding: 8px; margin-bottom: 12px; font-size: 0.8em;">
-                            <strong>⚠️ Currency Note:</strong> Stock trades in {stock_currency}, financials reported in {reporting_currency}.
-                            Intrinsic value shown in {reporting_currency}.
-                        </div>
-                        """
+                        currency_warning = f'<div style="background: #fef7e0; border: 1px solid #f9ab00; border-radius: 4px; padding: 8px; margin-bottom: 12px; font-size: 0.8em;"><strong>⚠️ Currency Note:</strong> Stock trades in {stock_currency}, financials reported in {reporting_currency}. Intrinsic value shown in {reporting_currency}.</div>'
 
                     discount_text = f"{discount:.1f}%" if discount > 0 else f"{abs(discount):.1f}%"
                     discount_label = "Discount" if discount > 0 else "Premium"
@@ -2092,34 +2087,8 @@ with tab_history:
                     # Show country if not US
                     country_display = f" • {country}" if country and country not in ['N/A', 'United States', 'United States of America'] else ""
 
-                    info_box_html = f"""
-                    <div style="border: 1px solid #dadce0; border-radius: 8px; padding: 16px; background: #fff;">
-                        <div style="font-weight: 600; font-size: 1.1em; color: #202124;">{company_name}</div>
-                        <div style="font-size: 0.85em; color: #5f6368; margin-bottom: 12px;">{sector} • {industry}{country_display}</div>
-                        {about_html}
-                        {currency_warning}
-                        <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 12px 0;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <div>
-                                <div style="font-size: 0.75em; color: #5f6368;">Current Price ({stock_currency})</div>
-                                <div style="font-size: 1.1em; font-weight: 500;">{price_formatted}</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 0.75em; color: #5f6368;">Intrinsic Value ({reporting_currency})</div>
-                                <div style="font-size: 1.1em; font-weight: 500;">{iv_formatted}</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 0.75em; color: #5f6368;">{discount_label}</div>
-                                <div style="font-size: 1.1em; font-weight: 500; color: {discount_color};">{discount_text}</div>
-                                <div style="font-size: 0.7em; color: {discount_color};">↑ {valuation_text}</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 0.75em; color: #5f6368;">Market Cap</div>
-                                <div style="font-size: 1.1em; font-weight: 500;">{format_market_cap(mkt_cap)}</div>
-                            </div>
-                        </div>
-                    </div>
-                    """
+                    # Build HTML without indentation to avoid Streamlit code block rendering
+                    info_box_html = f'<div style="border: 1px solid #dadce0; border-radius: 8px; padding: 16px; background: #fff;"><div style="font-weight: 600; font-size: 1.1em; color: #202124;">{company_name}</div><div style="font-size: 0.85em; color: #5f6368; margin-bottom: 12px;">{sector} • {industry}{country_display}</div>{about_html}{currency_warning}<hr style="border: none; border-top: 1px solid #e0e0e0; margin: 12px 0;"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;"><div><div style="font-size: 0.75em; color: #5f6368;">Current Price ({stock_currency})</div><div style="font-size: 1.1em; font-weight: 500;">{price_formatted}</div></div><div><div style="font-size: 0.75em; color: #5f6368;">Intrinsic Value ({reporting_currency})</div><div style="font-size: 1.1em; font-weight: 500;">{iv_formatted}</div></div><div><div style="font-size: 0.75em; color: #5f6368;">{discount_label}</div><div style="font-size: 1.1em; font-weight: 500; color: {discount_color};">{discount_text}</div><div style="font-size: 0.7em; color: {discount_color};">↑ {valuation_text}</div></div><div><div style="font-size: 0.75em; color: #5f6368;">Market Cap</div><div style="font-size: 1.1em; font-weight: 500;">{format_market_cap(mkt_cap)}</div></div></div></div>'
                     st.markdown(info_box_html, unsafe_allow_html=True)
 
 # Footer
