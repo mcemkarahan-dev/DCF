@@ -34,7 +34,7 @@ st.set_page_config(
 )
 
 # Version for deployment verification
-APP_VERSION = "v2.8"
+APP_VERSION = "v2.9"
 
 # Compact UI via components.html - debounced to prevent loops
 import streamlit.components.v1 as components
@@ -920,6 +920,14 @@ with tab_screen:
                         st.session_state[f"sec_{sec}"] = True
                     for cap in filters.get('market_caps', []):
                         st.session_state[f"cap_{cap}"] = True
+                # Restore advanced filters
+                if 'advanced_filters' in loaded:
+                    adv = loaded['advanced_filters']
+                    st.session_state['adv_fcf_last_year'] = adv.get('fcf_last_year', 'Any')
+                    st.session_state['adv_fcf_years_3'] = adv.get('fcf_years_3', 0)
+                    st.session_state['adv_fcf_years_5'] = adv.get('fcf_years_5', 0)
+                    st.session_state['adv_fcf_years_10'] = adv.get('fcf_years_10', 0)
+                    st.session_state['adv_min_gross_margin'] = adv.get('min_gross_margin', 0.0)
                 st.session_state['last_loaded_config'] = selected_config
                 st.rerun()
 
@@ -940,6 +948,13 @@ with tab_screen:
                             'exchanges': current_exchanges,
                             'sectors': current_sectors,
                             'market_caps': current_caps
+                        },
+                        'advanced_filters': {
+                            'fcf_last_year': st.session_state.get('adv_fcf_last_year', 'Any'),
+                            'fcf_years_3': st.session_state.get('adv_fcf_years_3', 0),
+                            'fcf_years_5': st.session_state.get('adv_fcf_years_5', 0),
+                            'fcf_years_10': st.session_state.get('adv_fcf_years_10', 0),
+                            'min_gross_margin': st.session_state.get('adv_min_gross_margin', 0.0)
                         }
                     }
 
@@ -1225,16 +1240,17 @@ with tab_screen:
             for cap in all_caps:
                 st.checkbox(cap, key=f"cap_{cap}", disabled=exclude_mkt_cap)
 
-    # Max Stocks - label collapsed for alignment
+    # Max Stocks
     with filter_cols[3]:
+        st.caption("Max Stocks")
         max_stocks = st.number_input(
-            "Max",
+            "Max Stocks",
             min_value=5,
             max_value=100,
             value=20,
             step=5,
             label_visibility="collapsed",
-            help="Max stocks to screen"
+            help="Maximum number of stocks to screen"
         )
 
     # Reset button callback
@@ -1246,6 +1262,12 @@ with tab_screen:
         for cap in all_caps:
             st.session_state[f"cap_{cap}"] = False
         st.session_state["exclude_market_cap_filter"] = True
+        # Reset advanced filters
+        st.session_state["adv_fcf_last_year"] = "Any"
+        st.session_state["adv_fcf_years_3"] = 0
+        st.session_state["adv_fcf_years_5"] = 0
+        st.session_state["adv_fcf_years_10"] = 0
+        st.session_state["adv_min_gross_margin"] = 0.0
 
     with filter_cols[4]:
         st.button("Reset", on_click=reset_all_filters)
@@ -1258,30 +1280,40 @@ with tab_screen:
             fcf_last_year = st.selectbox(
                 "Positive FCF (Last Year)",
                 ["Any", "Yes", "No"],
-                index=0
+                index=["Any", "Yes", "No"].index(st.session_state.get("adv_fcf_last_year", "Any")),
+                key="adv_fcf_last_year"
             )
 
         with adv_cols[1]:
             fcf_years_3 = st.number_input(
-                "Min +FCF Years (3yr)", min_value=0, max_value=3, value=0,
+                "Min +FCF Years (3yr)", min_value=0, max_value=3,
+                value=st.session_state.get("adv_fcf_years_3", 0),
+                key="adv_fcf_years_3",
                 help="Min years with positive FCF in last 3 years"
             )
 
         with adv_cols[2]:
             fcf_years_5 = st.number_input(
-                "Min +FCF Years (5yr)", min_value=0, max_value=5, value=0,
+                "Min +FCF Years (5yr)", min_value=0, max_value=5,
+                value=st.session_state.get("adv_fcf_years_5", 0),
+                key="adv_fcf_years_5",
                 help="Min years with positive FCF in last 5 years"
             )
 
         with adv_cols[3]:
             fcf_years_10 = st.number_input(
-                "Min +FCF Years (10yr)", min_value=0, max_value=10, value=0,
+                "Min +FCF Years (10yr)", min_value=0, max_value=10,
+                value=st.session_state.get("adv_fcf_years_10", 0),
+                key="adv_fcf_years_10",
                 help="Min years with positive FCF in last 10 years"
             )
 
         with adv_cols[4]:
             min_gross_margin = st.number_input(
-                "Min Gross Margin %", min_value=0.0, max_value=100.0, value=0.0, step=5.0
+                "Min Gross Margin %", min_value=0.0, max_value=100.0,
+                value=st.session_state.get("adv_min_gross_margin", 0.0),
+                step=5.0,
+                key="adv_min_gross_margin"
             )
 
     # Compute selected filters from checkbox states
