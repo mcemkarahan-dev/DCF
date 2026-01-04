@@ -1,0 +1,19 @@
+name: Enrich Market Cap
+on:
+  workflow_dispatch:
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install supabase yfinance requests
+      - run: |
+          mkdir -p streamlit/.streamlit
+          echo 'SUPABASE_URL = "${{ secrets.SUPABASE_URL }}"' > streamlit/.streamlit/secrets.toml
+          echo 'SUPABASE_KEY = "${{ secrets.SUPABASE_KEY }}"' >> streamlit/.streamlit/secrets.toml
+          echo 'ROIC_API_KEY = "${{ secrets.ROIC_API_KEY }}"' >> streamlit/.streamlit/secrets.toml
+      - run: cd streamlit && python enrich_market_cap.py --batch-size 500 --workers 8
