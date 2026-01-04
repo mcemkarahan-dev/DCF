@@ -27,8 +27,8 @@ import db_storage  # Persistent database storage
 
 # Page configuration
 st.set_page_config(
-    page_title="DCF Stock Analyzer",
-    page_icon="📊",
+    page_title="DCF Screener v2.1",
+    page_icon="📈",
     layout="wide",
     initial_sidebar_state="collapsed"  # Collapse sidebar by default for cleaner look
 )
