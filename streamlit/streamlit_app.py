@@ -34,63 +34,60 @@ st.set_page_config(
 )
 
 # Version for deployment verification
-APP_VERSION = "v2.2-compact"
+APP_VERSION = "v2.3-compact"
 
-# JavaScript to compact UI elements after Streamlit renders
-st.markdown("""
+# Use components.html to inject JS that modifies parent document
+import streamlit.components.v1 as components
+
+components.html("""
 <script>
-// Wait for Streamlit to fully render, then compact elements
-function compactUI() {
+function compactParentUI() {
+    const parent = window.parent.document;
+
     // Compact all buttons
-    document.querySelectorAll('button').forEach(btn => {
-        btn.style.height = '32px';
-        btn.style.minHeight = '32px';
-        btn.style.padding = '0 12px';
-        btn.style.fontSize = '13px';
+    parent.querySelectorAll('button').forEach(btn => {
+        btn.style.setProperty('height', '32px', 'important');
+        btn.style.setProperty('min-height', '32px', 'important');
+        btn.style.setProperty('padding', '0 12px', 'important');
+        btn.style.setProperty('font-size', '13px', 'important');
     });
 
     // Compact all select containers
-    document.querySelectorAll('[data-baseweb="select"]').forEach(sel => {
-        sel.style.minHeight = '32px';
-        const inner = sel.querySelector('div');
-        if (inner) {
-            inner.style.minHeight = '32px';
-            inner.style.padding = '2px 8px';
-        }
+    parent.querySelectorAll('[data-baseweb="select"]').forEach(sel => {
+        sel.style.setProperty('min-height', '32px', 'important');
+    });
+
+    parent.querySelectorAll('[data-baseweb="select"] > div').forEach(div => {
+        div.style.setProperty('min-height', '32px', 'important');
+        div.style.setProperty('padding', '2px 8px', 'important');
     });
 
     // Compact all inputs
-    document.querySelectorAll('input').forEach(inp => {
-        inp.style.height = '32px';
-        inp.style.padding = '4px 8px';
-        inp.style.fontSize = '13px';
+    parent.querySelectorAll('input').forEach(inp => {
+        inp.style.setProperty('height', '32px', 'important');
+        inp.style.setProperty('padding', '4px 8px', 'important');
+        inp.style.setProperty('font-size', '13px', 'important');
     });
 
     // Compact expander headers
-    document.querySelectorAll('[data-testid="stExpander"] summary').forEach(exp => {
-        exp.style.padding = '8px 12px';
-        exp.style.minHeight = '36px';
+    parent.querySelectorAll('[data-testid="stExpander"] summary').forEach(exp => {
+        exp.style.setProperty('padding', '8px 12px', 'important');
+        exp.style.setProperty('min-height', '36px', 'important');
     });
 
-    // Reduce label sizes
-    document.querySelectorAll('label').forEach(lbl => {
-        lbl.style.fontSize = '12px';
+    // Reduce vertical gaps
+    parent.querySelectorAll('.element-container').forEach(el => {
+        el.style.setProperty('margin-bottom', '0.25rem', 'important');
     });
 
-    console.log('UI compacted v2.2');
+    console.log('UI compacted v2.3');
 }
 
-// Run on load and on Streamlit rerun
-if (document.readyState === 'complete') {
-    setTimeout(compactUI, 100);
-} else {
-    window.addEventListener('load', () => setTimeout(compactUI, 100));
-}
-
-// Also run periodically to catch dynamic updates
-setInterval(compactUI, 2000);
+// Run immediately and periodically
+compactParentUI();
+setInterval(compactParentUI, 1500);
 </script>
-""", unsafe_allow_html=True)
+""", height=0)
 
 # Custom CSS for Google Flights-inspired styling (Desktop + Mobile)
 st.markdown("""
