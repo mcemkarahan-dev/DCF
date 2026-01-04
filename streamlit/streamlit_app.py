@@ -39,10 +39,52 @@ st.markdown("""
     /* Import Google's Roboto font */
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
+    /* AGGRESSIVE: Target root and force smaller base font */
+    :root {
+        font-size: 14px !important;
+    }
+
     /* Apply Roboto font globally with smaller base size */
-    html, body, [class*="css"] {
-        font-family: 'Roboto', sans-serif;
-        font-size: 14px;
+    html, body, [class*="css"], .stApp, [data-testid="stAppViewContainer"] {
+        font-family: 'Roboto', sans-serif !important;
+        font-size: 14px !important;
+    }
+
+    /* AGGRESSIVE: Target ALL buttons */
+    button, [data-testid="baseButton-secondary"], [data-testid="baseButton-primary"] {
+        min-height: 32px !important;
+        height: 32px !important;
+        padding: 0 12px !important;
+        font-size: 13px !important;
+    }
+
+    /* AGGRESSIVE: Target ALL inputs and selects */
+    input, select, [data-baseweb="select"], [data-baseweb="input"] {
+        min-height: 32px !important;
+        height: 32px !important;
+        font-size: 13px !important;
+    }
+
+    /* AGGRESSIVE: Target selectbox containers */
+    [data-testid="stSelectbox"] > div > div {
+        min-height: 32px !important;
+    }
+
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+        min-height: 32px !important;
+        padding: 2px 8px !important;
+    }
+
+    /* AGGRESSIVE: Number inputs */
+    [data-testid="stNumberInput"] input {
+        height: 32px !important;
+        padding: 4px 8px !important;
+    }
+
+    /* AGGRESSIVE: Labels smaller */
+    label, [data-testid="stWidgetLabel"] {
+        font-size: 12px !important;
+        margin-bottom: 2px !important;
     }
 
     /* White background throughout */
