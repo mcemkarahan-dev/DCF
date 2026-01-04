@@ -39,9 +39,10 @@ st.markdown("""
     /* Import Google's Roboto font */
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
-    /* Apply Roboto font globally */
+    /* Apply Roboto font globally with smaller base size */
     html, body, [class*="css"] {
         font-family: 'Roboto', sans-serif;
+        font-size: 14px;
     }
 
     /* White background throughout */
@@ -49,23 +50,36 @@ st.markdown("""
         background-color: #ffffff;
     }
 
+    /* Constrain max width and reduce padding */
     .main .block-container {
         background-color: #ffffff;
-        padding-top: 1rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+        max-width: 1200px;
     }
 
-    /* Main header styling - clean, no emoji */
+    /* Reduce vertical spacing globally */
+    .element-container {
+        margin-bottom: 0.25rem !important;
+    }
+
+    /* Reduce spacing between elements */
+    .stVerticalBlock > div {
+        gap: 0.25rem;
+    }
+
+    /* Main header styling - smaller */
     .main-header {
         font-family: 'Roboto', sans-serif;
-        font-size: 1.5rem;
+        font-size: 1.25rem;
         font-weight: 500;
         color: #202124;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
     }
 
-    /* Tab styling - Google Flights style */
+    /* Tab styling - Google Flights style - more compact */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 4px;
         background-color: transparent;
         padding: 0;
         border-bottom: 1px solid #dadce0;
@@ -74,16 +88,16 @@ st.markdown("""
     }
 
     .stTabs [data-baseweb="tab"] {
-        height: 48px;
-        padding: 0 16px;
+        height: 36px;
+        padding: 0 12px;
         background-color: transparent;
         border-radius: 0;
         color: #5f6368;
         font-family: 'Roboto', sans-serif;
         font-weight: 500;
-        font-size: 14px;
+        font-size: 13px;
         border: none;
-        border-bottom: 3px solid transparent;
+        border-bottom: 2px solid transparent;
         white-space: nowrap;
     }
 
@@ -95,15 +109,38 @@ st.markdown("""
     .stTabs [aria-selected="true"] {
         background-color: transparent;
         color: #1a73e8;
-        border-bottom: 3px solid #1a73e8;
+        border-bottom: 2px solid #1a73e8;
     }
 
-    /* Google Flights style filter buttons */
+    /* Compact selectbox/dropdown styling */
+    .stSelectbox > div > div {
+        background-color: #ffffff;
+        border: 1px solid #dadce0;
+        border-radius: 4px;
+        min-height: 32px !important;
+        padding: 0 8px;
+    }
+
+    .stSelectbox > div > div > div {
+        padding: 4px 0 !important;
+        font-size: 13px !important;
+    }
+
+    .stSelectbox > div > div:hover {
+        background-color: #f8f9fa;
+    }
+
+    .stSelectbox label {
+        font-size: 12px !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Compact multiselect */
     .stMultiSelect > div > div {
         background-color: #ffffff;
         border: 1px solid #dadce0;
-        border-radius: 20px;
-        min-height: 36px;
+        border-radius: 4px;
+        min-height: 32px !important;
     }
 
     .stMultiSelect > div > div:hover {
@@ -112,37 +149,39 @@ st.markdown("""
 
     .stMultiSelect label {
         font-family: 'Roboto', sans-serif;
-        font-size: 14px;
+        font-size: 12px !important;
         font-weight: 500;
         color: #3c4043;
+        margin-bottom: 2px !important;
     }
 
-    .stSelectbox > div > div {
-        background-color: #ffffff;
-        border: 1px solid #dadce0;
-        border-radius: 20px;
-        min-height: 36px;
-    }
-
-    .stSelectbox > div > div:hover {
-        background-color: #f8f9fa;
-    }
-
-    /* Number input styling */
+    /* Compact number input styling */
     .stNumberInput > div > div > input {
         border: 1px solid #dadce0;
-        border-radius: 20px;
+        border-radius: 4px;
+        height: 32px !important;
+        padding: 4px 8px !important;
+        font-size: 13px !important;
     }
 
-    /* Button styling - Google style */
+    .stNumberInput label {
+        font-size: 12px !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Compact button styling */
     .stButton > button {
         font-family: 'Roboto', sans-serif;
         font-weight: 500;
-        border-radius: 20px;
+        font-size: 13px;
+        border-radius: 4px;
         border: 1px solid #dadce0;
         background-color: #ffffff;
         color: #3c4043;
-        min-height: 44px;
+        min-height: 32px !important;
+        height: 32px !important;
+        padding: 0 12px !important;
+        line-height: 30px;
     }
 
     .stButton > button:hover {
@@ -161,10 +200,54 @@ st.markdown("""
         border-color: #1557b0;
     }
 
-    /* Metric styling */
+    /* Compact checkbox styling */
+    .stCheckbox {
+        margin-bottom: 0 !important;
+    }
+
+    .stCheckbox label {
+        font-size: 13px !important;
+    }
+
+    .stCheckbox > label > div {
+        padding: 2px 0 !important;
+    }
+
+    /* Compact expander styling */
+    .streamlit-expanderHeader {
+        font-family: 'Roboto', sans-serif;
+        font-weight: 500;
+        font-size: 13px !important;
+        color: #3c4043;
+        background-color: #ffffff;
+        border: 1px solid #dadce0;
+        border-radius: 4px;
+        padding: 6px 12px !important;
+    }
+
+    details[data-testid="stExpander"] {
+        border: none !important;
+    }
+
+    details[data-testid="stExpander"] > summary {
+        padding: 6px 12px !important;
+    }
+
+    /* Compact slider */
+    .stSlider label {
+        font-size: 12px !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Metric styling - smaller */
     [data-testid="stMetricValue"] {
         font-family: 'Roboto', sans-serif;
         font-weight: 500;
+        font-size: 1.1rem !important;
+    }
+
+    [data-testid="stMetricLabel"] {
+        font-size: 12px !important;
     }
 
     .undervalued {
@@ -180,40 +263,37 @@ st.markdown("""
     /* Hide hamburger menu */
     #MainMenu {visibility: hidden;}
 
-    /* Expander styling */
-    .streamlit-expanderHeader {
-        font-family: 'Roboto', sans-serif;
-        font-weight: 500;
-        color: #3c4043;
-        background-color: #ffffff;
-        border: 1px solid #dadce0;
-        border-radius: 8px;
+    /* Reduce caption/label sizes */
+    .stCaption, small {
+        font-size: 11px !important;
     }
 
-    /* Info/warning boxes */
+    /* Info/warning boxes - more compact */
     .stAlert {
-        border-radius: 8px;
+        border-radius: 4px;
         border: none;
+        padding: 8px 12px !important;
+        font-size: 13px;
     }
 
-    /* Clean divider */
+    /* Clean divider - less margin */
     hr {
         border: none;
         border-top: 1px solid #dadce0;
-        margin: 1rem 0;
+        margin: 0.5rem 0;
     }
 
-    /* Logo and header container */
+    /* Logo and header container - smaller */
     .logo-header {
         display: flex;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 1rem;
+        gap: 8px;
+        margin-bottom: 0.5rem;
     }
 
     .logo-svg {
-        width: 48px;
-        height: 28px;
+        width: 36px;
+        height: 22px;
         flex-shrink: 0;
     }
 
@@ -221,12 +301,29 @@ st.markdown("""
         margin-bottom: 0;
     }
 
+    /* Section headers - smaller */
+    h5, .stMarkdown h5 {
+        font-size: 14px !important;
+        margin-bottom: 8px !important;
+        margin-top: 8px !important;
+    }
+
+    /* Column gaps - tighter */
+    [data-testid="column"] {
+        padding: 0 4px !important;
+    }
+
+    /* Progress bar - thinner */
+    .stProgress > div > div {
+        height: 4px !important;
+    }
+
     /* ==================== MOBILE RESPONSIVE STYLES ==================== */
     @media (max-width: 768px) {
         /* Reduce padding on mobile */
         .main .block-container {
-            padding-left: 1rem;
-            padding-right: 1rem;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
             padding-top: 0.5rem;
         }
 
