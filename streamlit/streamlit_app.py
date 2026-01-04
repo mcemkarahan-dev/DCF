@@ -796,8 +796,8 @@ with tab_screen:
         st.session_state['param_normalize'] = params.get('normalize_starting_value', True)
         st.session_state['param_norm_years'] = int(params.get('normalization_years', 5))
 
-    # Config management row
-    config_col1, config_col2, config_col3 = st.columns([2, 1, 1])
+    # Config management row - narrower columns
+    pad_left, config_col1, config_col2, config_col3, pad_right = st.columns([0.5, 1.5, 0.8, 0.8, 1.5])
 
     with config_col1:
         # Load existing configs from Supabase
@@ -1045,8 +1045,9 @@ with tab_screen:
             for cap in all_caps:
                 st.session_state[f"cap_{cap}"] = False
 
-    # Filter buttons row
-    filter_cols = st.columns([1, 1, 1, 1, 0.8])
+    # Filter buttons row - add padding columns to narrow the content
+    pad1, filter_col1, filter_col2, filter_col3, filter_col4, filter_col5, pad2 = st.columns([0.3, 1, 1, 1, 0.8, 0.6, 0.3])
+    filter_cols = [filter_col1, filter_col2, filter_col3, filter_col4, filter_col5]
 
     # Exchange Filter
     with filter_cols[0]:
@@ -1242,17 +1243,17 @@ with tab_screen:
     else:
         st.caption(f"Cache: {backend} (shared) | Total cached for these filters: {total_checked}")
 
-    # Run button and controls
-    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
+    # Run button and controls - narrower
+    _, col1, col2, col3, col4, _ = st.columns([0.3, 0.8, 0.6, 0.7, 1.5, 1])
 
     with col1:
-        run_batch = st.button("Run Batch Analysis", type="primary", use_container_width=True)
+        run_batch = st.button("Run Batch", type="primary")
 
     with col2:
-        stop_batch = st.button("Stop", use_container_width=True)
+        stop_batch = st.button("Stop")
 
     with col3:
-        if st.button("Clear Cache", type="secondary", use_container_width=True):
+        if st.button("Clear Cache"):
             db_storage.clear_all_checked_tickers()
             st.success("Cache cleared!")
             st.rerun()
